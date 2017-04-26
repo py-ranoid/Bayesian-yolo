@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import math
 from collections import OrderedDict
+from utils import *
 
 class Net(nn.Module):
     def __init__(self):
@@ -109,38 +110,8 @@ class Net(nn.Module):
         start = load_conv_bn(buf, start, self.cnn2[3], self.cnn2[4])
         start = load_conv(buf, start, self.cnn2[6])
 
-def sigmoid(x):
-    return 1.0/(math.exp(-x)+1.)
 
-def get_region_boxes(output, thresh):
-    num_classes = 20
-    num_anchors = 5
-    anchors = [1.08,1.19,  3.42,4.41,  6.63,11.38,  9.42,5.11,  16.62,10.52]
-    assert(output.size(0) == 1)
-    assert(output.size(1) == (5+num_classes)*num_anchors)
-    h = output.size(2)
-    w = output.size(3)
-    boxes = []
-    for cy in range(h):
-        for cx in range(w):
-            for i in range(num_anchors):
-                start = (5+num_classes)*i
-                bcx = sigmoid(output[0][start][cy][cx]) + cx
-                bcy = sigmoid(output[0][start+1][cy][cx]) + cy
-                bw = anchors[2*i] * math.exp(output[0][start+2][cy][cx])
-                bh = anchors[2*i+1] * math.exp(output[0][start+3][cy][cx])
-                det_conf = sigmoid(output[0][start+4][cy][cx]) 
-                x1 = bcx - bw/2
-                y1 = bcy - bh/2
-                x2 = bcx + bw/2
-                y2 = bcy + bh/2
-                if det_conf > thresh:
-                    box = [x1/w, y1/h, x2/w, y2/h, det_conf]
-                    boxes.append(box)
-    return boxes
-                
-
-def do_detect(model, img):
+def do_detect(model, img, thresh, nms_thresh):
     model.eval()
     img = img.resize((416, 416))
     width = img.width
@@ -153,23 +124,10 @@ def do_detect(model, img):
 
     output = model(img)
     output = output.data
-    boxes = get_region_boxes(output, 0.6)
-    #boxes = nms(boxes, 0.4)
+    boxes = get_region_boxes(output, thresh)
+    boxes = nms(boxes, nms_thresh)
     return boxes
     
-def plot_boxes(img, boxes):
-    width = img.width
-    height = img.height
-    draw = ImageDraw.Draw(img)
-    for i in range(len(boxes)):
-        box = boxes[i]
-        x1 = box[0] * width
-        y1 = box[1] * height
-        x2 = box[2] * width
-        y2 = box[3] * height
-        draw.rectangle([x1, y1, x2, y2])
-    img.save('predict.png')
-
 ############################################
 m = Net() 
 m.float()
@@ -177,5 +135,5 @@ m.eval()
 m.load_darknet_weights('tiny-yolo-voc.weights')
 
 img = Image.open('person.jpg').convert('RGB')
-boxes = do_detect(m, img)
+boxes = do_detect(m, img, 0.5, 0.4)
 plot_boxes(img, boxes)

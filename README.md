@@ -1,17 +1,11 @@
 #### yolo2
 Todo:
-- [x] Multi-Gpu Framework
-- [x] Image List Data Loader
-- [x] Resize Transformer, resize to 32x32
-- [x] Conv2d with padding
-- [x] tiny-yolo for classification
-- [x] add batch normalization
-- [ ] transform darknet weights to pytorch
-- [ ] cffi demo
-- [ ] RegionLoss -> Function with backward
-- [ ] Train Yolo2 on face
+- [x] load darknet weights to pytorch
+- [x] evaluate tiny-yolo on single image
 
 
 #### Note
-1. add m.eval()
-2. transform running_var
+1. be sure to add m.eval()
+2. running_var is processed differently
+   darkent: sqrt(running_var) + 0.00001
+   pytorch: sqrt(running_var + 0.00001)
