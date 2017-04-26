@@ -1,5 +1,7 @@
 #### yolo2
-Todo:
+This repository can evaluate darknent trained model on pytorch which loads darkent trained weight file directly. See test_tiny_yolo.py as an example.
+
+#### Todo
 - [x] load darknet weights to pytorch
 - [x] evaluate tiny-yolo on single image
 - [ ] evaluate face test data
