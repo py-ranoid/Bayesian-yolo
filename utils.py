@@ -75,7 +75,7 @@ def get_region_boxes(output, thresh):
                     boxes.append(box)
     return boxes
 
-def plot_boxes(img, boxes):
+def plot_boxes(img, boxes, savename):
     width = img.width
     height = img.height
     draw = ImageDraw.Draw(img)
@@ -86,6 +86,6 @@ def plot_boxes(img, boxes):
         x2 = box[2] * width
         y2 = box[3] * height
         draw.rectangle([x1, y1, x2, y2])
-    img.save('predict.png')
+    img.save(savename)
 
 

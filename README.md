@@ -2,7 +2,7 @@
 Todo:
 - [x] load darknet weights to pytorch
 - [x] evaluate tiny-yolo on single image
-
+- [ ] evaluate face test data
 
 #### Note
 1. be sure to add m.eval()

@@ -136,4 +136,4 @@ m.load_darknet_weights('tiny-yolo-voc.weights')
 
 img = Image.open('person.jpg').convert('RGB')
 boxes = do_detect(m, img, 0.5, 0.4)
-plot_boxes(img, boxes)
+plot_boxes(img, boxes, 'predict.jpg')
