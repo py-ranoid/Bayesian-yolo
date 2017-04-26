@@ -7,5 +7,5 @@ Todo:
 #### Note
 1. be sure to add m.eval()
 2. running_var is processed differently
-   darkent: sqrt(running_var) + 0.00001
-   pytorch: sqrt(running_var + 0.00001)
+   - darkent: sqrt(running_var) + 0.00001
+   - pytorch: sqrt(running_var + 0.00001)
