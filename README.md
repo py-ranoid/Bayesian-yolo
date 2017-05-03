@@ -6,6 +6,7 @@ Convert https://pjreddie.com/darknet/yolo/ into pytorch2. This repository is try
 - [x] load darknet saved weights
 - [x] save as darknet weights
 - [x] fast evaluation
+- [ ] pascal voc validation
 - [ ] fast training
 
 ---
