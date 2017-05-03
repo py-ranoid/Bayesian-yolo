@@ -1,12 +1,12 @@
 ### pytorch-yolo2
 Convert https://pjreddie.com/darknet/yolo/ into pytorch2. This repository is trying to achieve the following goals.
-- detect, partial, valid functions
-- load darknet cfg
-- load darknet saved weights
-- save as darknet weights
-- fast evaluation
-- fast training
-- implement RegionLoss, MaxPoolStrid1, Reorg, GolbalAvgPool2d without cffi bindings
+- [x] implement RegionLoss, MaxPoolStrid1, Reorg, GolbalAvgPool2d without cffi bindings
+- [x] detect, partial, valid functions
+- [x] load darknet cfg
+- [x] load darknet saved weights
+- [x] save as darknet weights
+- [x] fast evaluation
+- [ ] fast training
 
 ---
 #### Detection Using A Pre-Trained Model
