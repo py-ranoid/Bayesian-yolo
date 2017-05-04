@@ -76,11 +76,7 @@ python train.py cfg/voc.data cfg/yolo-voc.cfg darknet19_448.conv.23
 python valid.py cfg/voc.data cfg/yolo-voc.cfg ../yolo-voc.weights
 ```
 ---
-#### Todo
-- [x] support avgpool softmax sse layer in darknet2.py
-- [x] verify python partial.py cfg/darknet19_448.cfg darknet19_448.weights darknet19_448.conv.23 23
-- [ ] compare with darknet to make same forward softmax results by modeify batch_norm layer
----
+
 #### Problems
 ##### 1. Running variance difference between darknet and pytorch
 Change the code in normalize_cpu to make the same result
