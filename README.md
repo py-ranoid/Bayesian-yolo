@@ -7,7 +7,7 @@ Convert https://pjreddie.com/darknet/yolo/ into pytorch. This repository is tryi
 - [x] save as darknet weights
 - [x] fast evaluation
 - [ ] pascal voc validation
-- [ ] fast training
+- [ ] train pascal voc
 
 ---
 #### Detection Using A Pre-Trained Model
