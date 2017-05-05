@@ -1,6 +1,6 @@
 ### pytorch-yolo2
 Convert https://pjreddie.com/darknet/yolo/ into pytorch. This repository is trying to achieve the following goals.
-- [x] implement RegionLoss, MaxPoolStrid1, Reorg, GolbalAvgPool2d without cffi bindings
+- [x] implement RegionLoss, MaxPoolStrid1, Reorg, GolbalAvgPool2d
 - [x] detect, partial functions
 - [x] load darknet cfg
 - [x] load darknet saved weights
