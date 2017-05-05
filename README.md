@@ -8,7 +8,7 @@ Convert https://pjreddie.com/darknet/yolo/ into pytorch. This repository is tryi
 - [x] fast evaluation
 - [ ] pascal voc validation
 - [ ] train pascal voc
-
+- [ ] data augmentation
 ---
 #### Detection Using A Pre-Trained Model
 ```
