@@ -74,7 +74,7 @@ def convert2cpu(gpu_matrix):
 def convert2cpu_long(gpu_matrix):
     return torch.LongTensor(gpu_matrix.size()).copy_(gpu_matrix)
 
-def get_region_boxes(output, conf_thresh, num_classes, anchors):
+def get_region_boxes(output, conf_thresh, num_classes, anchors, only_objectness=1):
     num_anchors = len(anchors)/2
     if output.dim() == 3:
         output = output.unsqueeze(0)
@@ -108,8 +108,12 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors):
                 for i in range(num_anchors):
                     ind = i*h*w + cy * w + cx
                     det_conf =  det_confs[ind]
+                    if only_objectness:
+                        conf =  det_confs[ind]
+                    else:
+                        conf = det_confs[ind] * cls_confs[ind]
     
-                    if det_conf > conf_thresh:
+                    if conf > conf_thresh:
                         bcx = xy[0][ind] + cx
                         bcy = xy[1][ind] + cy
                         bw = anchors[2*i] * wh[0][ind]
@@ -176,8 +180,12 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors):
                     for i in range(num_anchors):
                         ind = b*sz_hwa + i*sz_hw + cy*w + cx
                         det_conf =  det_confs_cpu[ind]
+                        if only_objectness:
+                            conf =  det_confs_cpu[ind]
+                        else:
+                            conf = det_confs_cpu[ind] * cls_confs_cpu[ind]
         
-                        if det_conf > conf_thresh:
+                        if conf > conf_thresh:
                             bcx = xs_cpu[ind]
                             bcy = ys_cpu[ind]
                             bw = ws_cpu[ind]
@@ -255,6 +263,15 @@ def load_class_names(namesfile):
         line = line.rstrip()
         class_names.append(line)
     return class_names
+
+def image2torch(img):
+    width = img.width
+    height = img.height
+    img = torch.ByteTensor(torch.ByteStorage.from_buffer(img.tobytes()))
+    img = img.view(height, width, 3).transpose(0,1).transpose(0,2).contiguous()
+    img = img.view(1, 3, height, width)
+    img = img.float().div(255.0)
+    return img
 
 def do_detect(model, img, conf_thresh, nms_thresh, use_cuda=1):
     model.eval()

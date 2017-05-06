@@ -47,4 +47,6 @@ if __name__ == '__main__':
         imgfile = sys.argv[3]
         detect(cfgfile, weightfile, imgfile, version=2)
     else:
-        detect('cfg/tiny-yolo-voc.cfg', 'tiny-yolo-voc.weights', 'data/person.jpg', version=1)
+        print('Usage: ')
+        print('  python detect.py cfgfile weightfile imgfile')
+        #detect('cfg/tiny-yolo-voc.cfg', 'tiny-yolo-voc.weights', 'data/person.jpg', version=1)

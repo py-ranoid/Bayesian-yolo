@@ -91,6 +91,8 @@ class Darknet(nn.Module):
         start = 0
         ind = 0
         for block in self.blocks:
+            if start >= buf.size:
+                break
             if block['type'] == 'net':
                 continue
             elif block['type'] == 'convolutional':

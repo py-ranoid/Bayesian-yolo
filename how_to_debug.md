@@ -1,5 +1,11 @@
+Before comparing the middle results, please use png images instead of jpeg images without resize.
+
 #### Pytorch-yolo2
-1. In darknet2.py, uncomment if condition to stop forward on certain layer
+1. set model to evaluation
+```
+m = m.eval()
+```
+2. In darknet2.py, uncomment if condition to stop forward on certain layer
 ```
     def forward(self, x):
         ind = -2
@@ -10,13 +16,13 @@
             #if ind > 27:
             #    break
 ```
-2. In utils.py:do_detect, add
+3. In utils.py:do_detect, add
 ```
 print(output.storage()[0:100])
 ```
 to get the layer output
 
-3. Prepare a test image, resized to 416x416, save to test.png. Stop resize
+4. Prepare a test image, resized to 416x416, save to test.png. Stop resize
 in detect.py:detect
 ```
 sized = img.resize((m.width, m.height)) ->
@@ -24,7 +30,9 @@ sized = img
 ```
 
 #### Darknet
-1. In src/detector.c:test_dector, stop resize
+1. set GPU and CUDNN to 0 in Makefile
+
+2. In src/detector.c:test_dector, stop resize
 ```
 image sized = letterbox_image(im, net.w, net.h);  ->
 image sized = im

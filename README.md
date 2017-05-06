@@ -1,14 +1,14 @@
 ### pytorch-yolo2
 Convert https://pjreddie.com/darknet/yolo/ into pytorch. This repository is trying to achieve the following goals.
-- [x] implement RegionLoss, MaxPoolStrid1, Reorg, GolbalAvgPool2d
-- [x] detect, partial functions
+- [x] implement RegionLoss, MaxPoolStrid1, Reorg, GolbalAvgPool2d without cffi bindings
+- [x] detect, partial, valid functions
 - [x] load darknet cfg
 - [x] load darknet saved weights
 - [x] save as darknet weights
 - [x] fast evaluation
-- [ ] pascal voc validation
+- [x] pascal voc validation
 - [ ] train pascal voc
-- [ ] data augmentation
+
 ---
 #### Detection Using A Pre-Trained Model
 ```
@@ -73,10 +73,16 @@ python train.py cfg/voc.data cfg/yolo-voc.cfg darknet19_448.conv.23
 ```
 ##### Evaluate The Model
 ```
-python valid.py cfg/voc.data cfg/yolo-voc.cfg ../yolo-voc.weights
+python valid.py cfg/voc.data cfg/yolo-voc.cfg yolo-voc.weights
+python scripts/voc_eval.py results/comp4_det_test_
+```
+mAP (we only use the top1 label of each box to compute mAP)
+```
+YOLOvs544 0.7498 (paper: 78.6)
+YOLOvs416 0.7329 (paper: 76.8)
+TinyYolo416 0.5287 (paper: 57.1)
 ```
 ---
-
 #### Problems
 ##### 1. Running variance difference between darknet and pytorch
 Change the code in normalize_cpu to make the same result

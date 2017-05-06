@@ -197,6 +197,8 @@ class Darknet2(nn.Module):
         start = 0
         ind = -2
         for block in self.blocks:
+            if start >= buf.size:
+                break
             ind = ind + 1
             if block['type'] == 'net':
                 continue
