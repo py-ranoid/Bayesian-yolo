@@ -59,7 +59,7 @@ init_epoch = model.seen / nsamples
 
 kwargs = {'num_workers': 8, 'pin_memory': True} if use_cuda else {}
 test_loader = torch.utils.data.DataLoader(
-    dataset.listDataset(testlist, shape=(160, 160),
+    dataset.listDataset(testlist, shape=(544, 544),
                    shuffle=False,
                    transform=transforms.Compose([
                        transforms.ToTensor(),
@@ -73,10 +73,10 @@ optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.1 ** (epoch // 50))
+    lr = learning_rate * (0.1 ** (epoch // 120))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
-    if epoch % 50 == 0:
+    if epoch % 120 == 0:
         logging('lr = %f' % (lr))
 
 def train(epoch):
@@ -105,9 +105,10 @@ def train(epoch):
         loss.backward()
         optimizer.step()
     print('')
-    logging('save weights to %s/%06d.weights' % (backupdir, epoch+1))
-    model.module.seen = (epoch + 1) * len(train_loader.dataset)
-    model.module.save_weights('%s/%06d.weights' % (backupdir, epoch+1))
+    if (epoch+1) % 15 == 0:
+        logging('save weights to %s/%06d.weights' % (backupdir, epoch+1))
+        model.module.seen = (epoch + 1) * len(train_loader.dataset)
+        model.module.save_weights('%s/%06d.weights' % (backupdir, epoch+1))
 
 def test(epoch):
     def truths_length(truths):
