@@ -13,7 +13,7 @@ import torch.backends.cudnn as cudnn
 from torchvision import datasets, transforms
 from torch.autograd import Variable
 
-import dataset
+import lmdb_utils
 import random
 import math
 from utils import *
@@ -30,10 +30,10 @@ weightfile    = sys.argv[3]
 data_options  = read_data_cfg(datacfg)
 net_options   = parse_cfg(cfgfile)[0]
 
-trainlist     = data_options['train']
-testlist      = data_options['valid']
+traindb       = data_options['train']
+testdb        = data_options['valid']
 backupdir     = data_options['backup']
-nsamples      = file_lines(trainlist)
+nsamples      = lmdb_utils.lmdb_nsamples(traindb)
 
 batch_size    = int(net_options['batch'])
 max_batches   = int(net_options['max_batches'])
@@ -59,11 +59,10 @@ init_epoch = model.seen / nsamples
 
 kwargs = {'num_workers': 8, 'pin_memory': True} if use_cuda else {}
 test_loader = torch.utils.data.DataLoader(
-    dataset.listDataset(testlist, shape=(160, 160),
+    lmdb_utils.lmdbDataset(testdb, shape=(160, 160),
                    shuffle=False,
-                   transform=transforms.Compose([
-                       transforms.ToTensor(),
-                   ]), train=False),
+                   transform=None,
+                   train=False),
     batch_size=batch_size, shuffle=False, **kwargs)
 
 if use_cuda:
@@ -76,16 +75,13 @@ def adjust_learning_rate(optimizer, epoch):
     lr = learning_rate * (0.1 ** (epoch // 50))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
-    if epoch % 50 == 0:
-        logging('lr = %f' % (lr))
+    logging('set lr=%f' % (lr))
 
 def train(epoch):
     train_loader = torch.utils.data.DataLoader(
-        dataset.listDataset(trainlist, shape=(model.module.width, model.module.height),
+        lmdb_utils.lmdbDataset(traindb, shape=(model.module.width, model.module.height),
                        shuffle=True,
-                       transform=transforms.Compose([
-                           transforms.ToTensor(),
-                       ]), train=True, seen=model.module.seen),
+                       train=True, seen=model.module.seen),
         batch_size=batch_size, shuffle=False, **kwargs)
 
     logging('epoch %d : processed %d samples' % (epoch, epoch * len(train_loader.dataset)))
@@ -160,7 +156,7 @@ def test(epoch):
     fscore = 2.0*precision*recall/(precision+recall+eps)
     logging("precision: %f, recall: %f, fscore: %f" % (precision, recall, fscore))
 
-evaluate = False
+evaluate = True
 if evaluate:
     print('evaluating ...')
     test(0)

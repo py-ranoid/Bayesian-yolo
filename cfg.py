@@ -1,4 +1,5 @@
 import torch
+from utils import convert2cpu
 
 def parse_cfg(cfgfile):
     blocks = []
@@ -140,8 +141,12 @@ def load_conv(buf, start, conv_model):
     return start
 
 def save_conv(fp, conv_model):
-    conv_model.bias.data.numpy().tofile(fp)
-    conv_model.weight.data.numpy().tofile(fp)
+    if conv_model.bias.is_cuda:
+        convert2cpu(conv_model.bias.data).numpy().tofile(fp)
+        convert2cpu(conv_model.weight.data).numpy().tofile(fp)
+    else:
+        conv_model.bias.data.numpy().tofile(fp)
+        conv_model.weight.data.numpy().tofile(fp)
 
 def load_conv_bn(buf, start, conv_model, bn_model):
     num_w = conv_model.weight.numel()
@@ -154,11 +159,18 @@ def load_conv_bn(buf, start, conv_model, bn_model):
     return start
 
 def save_conv_bn(fp, conv_model, bn_model):
-    bn_model.bias.data.numpy().tofile(fp)
-    bn_model.weight.data.numpy().tofile(fp)
-    bn_model.running_mean.numpy().tofile(fp)
-    bn_model.running_var.numpy().tofile(fp)
-    conv_model.weight.data.numpy().tofile(fp)
+    if bn_model.bias.is_cuda:
+        convert2cpu(bn_model.bias.data).numpy().tofile(fp)
+        convert2cpu(bn_model.weight.data).numpy().tofile(fp)
+        convert2cpu(bn_model.running_mean).numpy().tofile(fp)
+        convert2cpu(bn_model.running_var).numpy().tofile(fp)
+        convert2cpu(conv_model.weight.data).numpy().tofile(fp)
+    else:
+        bn_model.bias.data.numpy().tofile(fp)
+        bn_model.weight.data.numpy().tofile(fp)
+        bn_model.running_mean.numpy().tofile(fp)
+        bn_model.running_var.numpy().tofile(fp)
+        conv_model.weight.data.numpy().tofile(fp)
 
 def load_fc(buf, start, fc_model):
     num_w = fc_model.weight.numel()

@@ -1,3 +1,4 @@
+import sys
 import os
 import time
 import math
@@ -64,7 +65,8 @@ def nms(boxes, nms_thresh):
             out_boxes.append(box_i)
             for j in range(i+1, len(boxes)):
                 box_j = boxes[sortIds[j]]
-                if bbox_iou(box_i, box_j) > nms_thresh:
+                if bbox_iou(box_i, box_j, x1y1x2y2=False) > nms_thresh:
+                    #print(box_i, box_j, bbox_iou(box_i, box_j, x1y1x2y2=False))
                     box_j[4] = 0
     return out_boxes
 
@@ -74,8 +76,8 @@ def convert2cpu(gpu_matrix):
 def convert2cpu_long(gpu_matrix):
     return torch.LongTensor(gpu_matrix.size()).copy_(gpu_matrix)
 
-def get_region_boxes(output, conf_thresh, num_classes, anchors, only_objectness=1):
-    num_anchors = len(anchors)/2
+def get_region_boxes(output, conf_thresh, num_classes, anchors, num_anchors, only_objectness=1):
+    anchor_step = len(anchors)/num_anchors
     if output.dim() == 3:
         output = output.unsqueeze(0)
     batch = output.size(0)
@@ -116,19 +118,11 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors, only_objectness=
                     if conf > conf_thresh:
                         bcx = xy[0][ind] + cx
                         bcy = xy[1][ind] + cy
-                        bw = anchors[2*i] * wh[0][ind]
-                        bh = anchors[2*i+1] * wh[1][ind]
+                        bw = anchors[anchor_step*i] * wh[0][ind]
+                        bh = anchors[anchor_step*i+1] * wh[1][ind]
                         cls_conf = cls_confs[ind]
                         cls_id = cls_ids[ind]
-                        x1 = bcx - bw/2
-                        y1 = bcy - bh/2
-                        x2 = bcx + bw/2
-                        y2 = bcy + bh/2
-                        x1 = max(x1, 0.0)
-                        y1 = max(y1, 0.0)
-                        x2 = min(x2, w)
-                        y2 = min(y2, h)
-                        box = [x1/w, y1/h, x2/w, y2/h, det_conf, cls_conf, cls_id]
+                        box = [bcx/w, bcy/h, bw/w, bh/h, det_conf, cls_conf, cls_id]
                         boxes.append(box)
         t3 = time.time()
         if False:
@@ -148,12 +142,12 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors, only_objectness=
         xs = torch.sigmoid(output[0]) + grid_x
         ys = torch.sigmoid(output[1]) + grid_y
 
-        anchor_x = torch.Tensor(anchors).view(num_anchors,2).index_select(1, torch.LongTensor([0]))
-        anchor_y = torch.Tensor(anchors).view(num_anchors,2).index_select(1, torch.LongTensor([1]))
-        anchor_x = anchor_x.repeat(batch, 1).repeat(1, 1, h*w).view(batch*num_anchors*h*w).cuda()
-        anchor_y = anchor_y.repeat(batch, 1).repeat(1, 1, h*w).view(batch*num_anchors*h*w).cuda()
-        ws = torch.exp(output[2]) * anchor_x
-        hs = torch.exp(output[3]) * anchor_y
+        anchor_w = torch.Tensor(anchors).view(num_anchors, anchor_step).index_select(1, torch.LongTensor([0]))
+        anchor_h = torch.Tensor(anchors).view(num_anchors, anchor_step).index_select(1, torch.LongTensor([1]))
+        anchor_w = anchor_w.repeat(batch, 1).repeat(1, 1, h*w).view(batch*num_anchors*h*w).cuda()
+        anchor_h = anchor_h.repeat(batch, 1).repeat(1, 1, h*w).view(batch*num_anchors*h*w).cuda()
+        ws = torch.exp(output[2]) * anchor_w
+        hs = torch.exp(output[3]) * anchor_h
 
         det_confs = torch.sigmoid(output[4])
 
@@ -192,15 +186,7 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors, only_objectness=
                             bh = hs_cpu[ind]
                             cls_conf = cls_confs_cpu[ind]
                             cls_id = cls_ids_cpu[ind]
-                            x1 = bcx - bw/2
-                            y1 = bcy - bh/2
-                            x2 = bcx + bw/2
-                            y2 = bcy + bh/2
-                            x1 = max(x1, 0.0)
-                            y1 = max(y1, 0.0)
-                            x2 = min(x2, w)
-                            y2 = min(y2, h)
-                            box = [x1/w, y1/h, x2/w, y2/h, det_conf, cls_conf, cls_id]
+                            box = [bcx/w, bcy/h, bw/w, bh/h, det_conf, cls_conf, cls_id]
                             boxes.append(box)
             all_boxes.append(boxes)
         t3 = time.time()
@@ -227,10 +213,10 @@ def plot_boxes(img, boxes, savename, class_names=None):
     draw = ImageDraw.Draw(img)
     for i in range(len(boxes)):
         box = boxes[i]
-        x1 = box[0] * width
-        y1 = box[1] * height
-        x2 = box[2] * width
-        y2 = box[3] * height
+        x1 = (box[0] - box[2]/2.0) * width
+        y1 = (box[1] - box[3]/2.0) * height
+        x2 = (box[0] + box[2]/2.0) * width
+        y2 = (box[1] + box[3]/2.0) * height
 
         rgb = (255, 0, 0)
         if len(box) >= 7 and class_names:
@@ -250,10 +236,19 @@ def plot_boxes(img, boxes, savename, class_names=None):
 def read_truths(lab_path):
     if os.path.getsize(lab_path):
         truths = np.loadtxt(lab_path)
-        truths = truths.reshape(truths.size/5, 5)
+        truths = truths.reshape(truths.size/5, 5) # to avoid single truth problem
         return truths
     else:
         return np.array([])
+
+def read_truths_args(lab_path, min_box_scale):
+    truths = read_truths(lab_path)
+    new_truths = []
+    for i in range(truths.shape[0]):
+        if truths[i][3] < min_box_scale:
+            continue
+        new_truths.append([truths[i][0], truths[i][1], truths[i][2], truths[i][3], truths[i][4]])
+    return np.array(new_truths)
 
 def load_class_names(namesfile):
     class_names = []
@@ -293,9 +288,14 @@ def do_detect(model, img, conf_thresh, nms_thresh, use_cuda=1):
 
     output = model(img)
     output = output.data
+    #for j in range(100):
+    #    sys.stdout.write('%f ' % (output.storage()[j]))
+    #print('')
     t3 = time.time()
 
-    boxes = get_region_boxes(output, conf_thresh, model.num_classes, model.anchors)
+    boxes = get_region_boxes(output, conf_thresh, model.num_classes, model.anchors, model.num_anchors)
+    #for j in range(len(boxes)):
+    #    print(boxes[j])
     t4 = time.time()
 
     boxes = nms(boxes, nms_thresh)
@@ -312,3 +312,66 @@ def do_detect(model, img, conf_thresh, nms_thresh, use_cuda=1):
         print('-----------------------------------')
     return boxes
 
+def read_data_cfg(datacfg):
+    options = dict()
+    with open(datacfg, 'r') as fp:
+        lines = fp.readlines()
+
+    for line in lines:
+        line = line.strip()
+        if line == '':
+            continue
+        key,value = line.split('=')
+        key = key.strip()
+        value = value.strip()
+        options[key] = value
+    return options
+
+def file_lines(thefilepath):
+    count = 0
+    thefile = open(thefilepath, 'rb')
+    while True:
+        buffer = thefile.read(8192*1024)
+        if not buffer:
+            break
+        count += buffer.count('\n')
+    thefile.close( )
+    return count
+
+def get_image_size(fname):
+    '''Determine the image type of fhandle and return its size.
+    from draco'''
+    with open(fname, 'rb') as fhandle:
+        head = fhandle.read(24)
+        if len(head) != 24: 
+            return
+        if imghdr.what(fname) == 'png':
+            check = struct.unpack('>i', head[4:8])[0]
+            if check != 0x0d0a1a0a:
+                return
+            width, height = struct.unpack('>ii', head[16:24])
+        elif imghdr.what(fname) == 'gif':
+            width, height = struct.unpack('<HH', head[6:10])
+        elif imghdr.what(fname) == 'jpeg':
+            try:
+                fhandle.seek(0) # Read 0xff next
+                size = 2 
+                ftype = 0 
+                while not 0xc0 <= ftype <= 0xcf:
+                    fhandle.seek(size, 1)
+                    byte = fhandle.read(1)
+                    while ord(byte) == 0xff:
+                        byte = fhandle.read(1)
+                    ftype = ord(byte)
+                    size = struct.unpack('>H', fhandle.read(2))[0] - 2 
+                # We are at a SOFn block
+                fhandle.seek(1, 1)  # Skip `precision' byte.
+                height, width = struct.unpack('>HH', fhandle.read(4))
+            except Exception: #IGNORE:W0703
+                return
+        else:
+            return
+        return width, height
+
+def logging(message):
+    print('%s %s' % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), message))

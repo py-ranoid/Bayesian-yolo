@@ -4,13 +4,9 @@ from PIL import Image, ImageDraw
 from tiny_yolo import TinyYoloNet
 from utils import do_detect, plot_boxes, load_class_names
 from darknet import Darknet
-from darknet2 import Darknet2
 
-def detect(cfgfile, weightfile, imgfile, version=2):
-    if version == 1:
-        m = Darknet(cfgfile) 
-    elif version == 2:
-        m = Darknet2(cfgfile) 
+def detect(cfgfile, weightfile, imgfile):
+    m = Darknet(cfgfile)
 
     m.print_network()
     m.load_weights(weightfile)
@@ -45,7 +41,7 @@ if __name__ == '__main__':
         cfgfile = sys.argv[1]
         weightfile = sys.argv[2]
         imgfile = sys.argv[3]
-        detect(cfgfile, weightfile, imgfile, version=2)
+        detect(cfgfile, weightfile, imgfile)
     else:
         print('Usage: ')
         print('  python detect.py cfgfile weightfile imgfile')

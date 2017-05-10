@@ -5,7 +5,7 @@ Before comparing the middle results, please use png images instead of jpeg image
 ```
 m = m.eval()
 ```
-2. In darknet2.py, uncomment if condition to stop forward on certain layer
+2. In darknet.py, uncomment if condition to stop forward on certain layer
 ```
     def forward(self, x):
         ind = -2

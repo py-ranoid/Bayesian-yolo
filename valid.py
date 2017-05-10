@@ -1,4 +1,4 @@
-from darknet2 import Darknet2
+from darknet import Darknet
 import struct
 import imghdr
 import dataset
@@ -8,56 +8,6 @@ from torchvision import datasets, transforms
 from utils import *
 import os
 
-def get_image_size(fname):
-    '''Determine the image type of fhandle and return its size.
-    from draco'''
-    with open(fname, 'rb') as fhandle:
-        head = fhandle.read(24)
-        if len(head) != 24: 
-            return
-        if imghdr.what(fname) == 'png':
-            check = struct.unpack('>i', head[4:8])[0]
-            if check != 0x0d0a1a0a:
-                return
-            width, height = struct.unpack('>ii', head[16:24])
-        elif imghdr.what(fname) == 'gif':
-            width, height = struct.unpack('<HH', head[6:10])
-        elif imghdr.what(fname) == 'jpeg':
-            try:
-                fhandle.seek(0) # Read 0xff next
-                size = 2 
-                ftype = 0 
-                while not 0xc0 <= ftype <= 0xcf:
-                    fhandle.seek(size, 1)
-                    byte = fhandle.read(1)
-                    while ord(byte) == 0xff:
-                        byte = fhandle.read(1)
-                    ftype = ord(byte)
-                    size = struct.unpack('>H', fhandle.read(2))[0] - 2 
-                # We are at a SOFn block
-                fhandle.seek(1, 1)  # Skip `precision' byte.
-                height, width = struct.unpack('>HH', fhandle.read(4))
-            except Exception: #IGNORE:W0703
-                return
-        else:
-            return
-        return width, height
-
-def read_data_cfg(datacfg):
-    options = dict()
-    with open(datacfg, 'r') as fp:
-        lines = fp.readlines()
-
-    for line in lines:
-        line = line.strip()
-        if line == '':
-            continue
-        key,value = line.split('=')
-        key = key.strip()
-        value = value.strip()
-        options[key] = value
-    return options
-    
 def valid(datacfg, cfgfile, weightfile, outfile):
     options = read_data_cfg(datacfg)
     valid_images = options['valid']
@@ -69,17 +19,17 @@ def valid(datacfg, cfgfile, weightfile, outfile):
         tmp_files = fp.readlines()
         valid_files = [item.rstrip() for item in tmp_files]
     
-    m = Darknet2(cfgfile)
+    m = Darknet(cfgfile)
     m.print_network()
     m.load_weights(weightfile)
     m.cuda()
     m.eval()
 
-    valid_dataset = dataset.listDataset(valid_images, shuffle=False,
+    valid_dataset = dataset.listDataset(valid_images, shape=(m.width, m.height),
+                       shuffle=False,
                        transform=transforms.Compose([
                            transforms.ToTensor(),
                        ]))
-    valid_dataset.size = (m.width, m.height)
     valid_batchsize = 64
 
     kwargs = {'num_workers': 4, 'pin_memory': True}
@@ -101,7 +51,7 @@ def valid(datacfg, cfgfile, weightfile, outfile):
         data = data.cuda()
         data = Variable(data, volatile = True)
         output = m(data).data
-        batch_boxes = get_region_boxes(output, conf_thresh, m.num_classes, m.anchors, 0)
+        batch_boxes = get_region_boxes(output, conf_thresh, m.num_classes, m.anchors, m.num_anchors, 0)
         for i in range(output.size(0)):
             lineId = lineId + 1
             fileId = os.path.basename(valid_files[lineId]).split('.')[0]

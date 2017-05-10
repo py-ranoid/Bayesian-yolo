@@ -10,8 +10,8 @@ class TinyYoloNet(nn.Module):
         super(TinyYoloNet, self).__init__()
         self.num_classes = 20
         self.anchors = [1.08,1.19,  3.42,4.41,  6.63,11.38,  9.42,5.11,  16.62,10.52]
-        num_anchors = len(self.anchors)/2
-        num_output = (5+self.num_classes)*num_anchors
+        self.num_anchors = len(self.anchors)/2
+        num_output = (5+self.num_classes)*self.num_anchors
 
         self.cnn = nn.Sequential(OrderedDict([
             # conv1
