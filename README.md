@@ -8,15 +8,9 @@ Convert https://pjreddie.com/darknet/yolo/ into pytorch. This repository is tryi
 - [x] fast evaluation
 - [x] pascal voc validation
 - [x] train pascal voc
+- [x] LMDB data set
 
 ---
-Todo
-- [x] Remove Darknet and mv Darknet2 to Darknet
-- [x] Train on face data
-- [ ] LMDB data set
-- [ ] Data augmentation
-- [ ] add cls loss and train on pascal voc
-
 #### Detection Using A Pre-Trained Model
 ```
 wget http://pjreddie.com/media/files/yolo.weights
