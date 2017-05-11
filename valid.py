@@ -28,7 +28,8 @@ def valid(datacfg, cfgfile, weightfile, outfile):
                        transform=transforms.Compose([
                            transforms.ToTensor(),
                        ]))
-    valid_batchsize = 64
+    valid_batchsize = 2
+    assert(valid_batchsize > 1)
 
     kwargs = {'num_workers': 4, 'pin_memory': True}
     valid_loader = torch.utils.data.DataLoader(
