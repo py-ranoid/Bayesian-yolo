@@ -49,7 +49,7 @@ tar xf VOCtest_06-Nov-2007.tar
 ```
 wget http://pjreddie.com/media/files/voc_label.py
 python voc_label.py
-cat 2007_train.txt 2007_val.txt 2012_*.txt > train.txt
+cat 2007_train.txt 2007_val.txt 2012_*.txt > voc_train.txt
 ```
 ##### Modify Cfg for Pascal Data
 Change the cfg/voc.data config file
