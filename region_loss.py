@@ -5,17 +5,17 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from utils import bbox_iou
 
-def build_targets(target, anchors, num_anchors, nW, nH):
+def build_targets(target, anchors, num_anchors, nH, nW):
     nB = target.size(0)
     nA = num_anchors
     anchor_step = len(anchors)/num_anchors
-    mask  = torch.zeros(nB, nA, nW, nH)
-    tx    = torch.zeros(nB, nA, nW, nH) 
-    ty    = torch.zeros(nB, nA, nW, nH) 
-    tw    = torch.zeros(nB, nA, nW, nH) 
-    th    = torch.zeros(nB, nA, nW, nH) 
-    tconf = torch.zeros(nB, nA, nW, nH)
-    tcls  = torch.zeros(nB, nA, nW, nH) 
+    mask  = torch.zeros(nB, nA, nH, nW)
+    tx    = torch.zeros(nB, nA, nH, nW) 
+    ty    = torch.zeros(nB, nA, nH, nW) 
+    tw    = torch.zeros(nB, nA, nH, nW) 
+    th    = torch.zeros(nB, nA, nH, nW) 
+    tconf = torch.zeros(nB, nA, nH, nW)
+    tcls  = torch.zeros(nB, nA, nH, nW) 
 
     nGT = 0
     for b in range(nB):
@@ -67,7 +67,7 @@ class RegionLoss(nn.Module):
         nH = output.data.size(2)
         nW = output.data.size(3)
 
-        nGT, mask, tx, ty, tw, th, tconf,tcls = build_targets(target.data, self.anchors, self.num_anchors, nW, nH)
+        nGT, mask, tx, ty, tw, th, tconf,tcls = build_targets(target.data, self.anchors, self.num_anchors, nH, nW)
         scale_mask = self.noobject_scale * (1-mask) + self.object_scale * mask
         cls_mask = torch.stack([mask.view(-1)]*nC, 1)
 
@@ -88,7 +88,8 @@ class RegionLoss(nn.Module):
         w    = output.index_select(2, Variable(torch.cuda.LongTensor([2]))).view(nB, nA, nH, nW)
         h    = output.index_select(2, Variable(torch.cuda.LongTensor([3]))).view(nB, nA, nH, nW)
         conf = F.sigmoid(output.index_select(2, Variable(torch.cuda.LongTensor([4]))).view(nB, nA, nH, nW))
-        cls  = output.index_select(2, Variable(torch.linspace(4,4+nC-1,nC).long().cuda())).view(nB, nC, nA, nH, nW).transpose(0,1).contiguous()
+        cls  = output.index_select(2, Variable(torch.linspace(4,4+nC-1,nC).long().cuda()))
+        cls  = cls.view(nB, nC, nA, nH, nW).transpose(0,1).contiguous()
         cls  = cls.view(nC,nB*nA*nH*nW).transpose(0,1).contiguous().view(nB*nA*nH*nW, nC)
 
         loss_x = self.coord_scale * nn.MSELoss(size_average=False)(x*mask, tx*mask) /nGT
