@@ -7,8 +7,9 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from torch.autograd import Variable
 
-import imghdr # get_image_size
 import struct # get_image_size
+import imghdr # get_image_size
+
 def sigmoid(x):
     return 1.0/(math.exp(-x)+1.)
 

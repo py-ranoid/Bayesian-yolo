@@ -59,7 +59,7 @@ init_epoch = model.seen / nsamples
 
 kwargs = {'num_workers': 8, 'pin_memory': True} if use_cuda else {}
 test_loader = torch.utils.data.DataLoader(
-    dataset.listDataset(testlist, shape=(544, 544),
+    dataset.listDataset(testlist, shape=(model.width, model.height),
                    shuffle=False,
                    transform=transforms.Compose([
                        transforms.ToTensor(),
