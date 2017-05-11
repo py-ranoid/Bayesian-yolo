@@ -1,7 +1,7 @@
 import sys
 import time
 from PIL import Image, ImageDraw
-from tiny_yolo import TinyYoloNet
+from models.tiny_yolo import TinyYoloNet
 from utils import do_detect, plot_boxes, load_class_names
 from darknet import Darknet
 
