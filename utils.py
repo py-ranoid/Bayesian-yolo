@@ -7,6 +7,8 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from torch.autograd import Variable
 
+import imghdr # get_image_size
+import struct # get_image_size
 def sigmoid(x):
     return 1.0/(math.exp(-x)+1.)
 
@@ -352,7 +354,7 @@ def get_image_size(fname):
             width, height = struct.unpack('>ii', head[16:24])
         elif imghdr.what(fname) == 'gif':
             width, height = struct.unpack('<HH', head[6:10])
-        elif imghdr.what(fname) == 'jpeg':
+        elif imghdr.what(fname) == 'jpeg' or imghdr.what(fname) == 'jpg':
             try:
                 fhandle.seek(0) # Read 0xff next
                 size = 2 

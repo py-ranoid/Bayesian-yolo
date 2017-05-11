@@ -35,14 +35,16 @@ def eval_list(cfgfile, weightfile, imglist):
         if img_path[0] == '#':
             continue
         lineId = lineId + 1
-        lab_path = img_path.replace('images', 'labels').replace('.jpg', '.txt').replace('.png', '.txt')
+        lab_path = img_path.replace('images', 'labels')
+        lab_path = lab_path.replace('JPEGImages', 'labels')
+        lab_path = lab_path.replace('.jpg', '.txt').replace('.png', '.txt')
         #truths = read_truths(lab_path)
         truths = read_truths_args(lab_path, min_box_scale)
         #print(truths)
 
         img = Image.open(img_path).convert('RGB').resize((eval_wid, eval_hei))
         boxes = do_detect(m, img, conf_thresh, nms_thresh, use_cuda)
-        if False:
+        if True:
             savename = "tmp/%06d.jpg" % (lineId)
             print("save %s" % savename)
             plot_boxes(img, boxes, savename)

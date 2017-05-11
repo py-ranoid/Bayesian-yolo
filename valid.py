@@ -1,6 +1,5 @@
 from darknet import Darknet
 import struct
-import imghdr
 import dataset
 import torch
 from torch.autograd import Variable
@@ -55,8 +54,8 @@ def valid(datacfg, cfgfile, weightfile, outfile):
         for i in range(output.size(0)):
             lineId = lineId + 1
             fileId = os.path.basename(valid_files[lineId]).split('.')[0]
-            width, height = get_image_size(valid_files[lineId])
             print(valid_files[lineId])
+            width, height = get_image_size(valid_files[lineId])
             boxes = batch_boxes[i]
             boxes = nms(boxes, nms_thresh)
             for box in boxes:
