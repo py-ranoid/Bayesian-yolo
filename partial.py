@@ -4,6 +4,7 @@ def partial(cfgfile, weightfile, outfile, cutoff):
     m = Darknet(cfgfile)
     m.print_network()
     m.load_weights(weightfile)
+    m.seen = 0
     m.save_weights(outfile, cutoff)
     print('save %s' % (outfile))
 
