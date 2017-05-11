@@ -59,8 +59,8 @@ class listDataset(Dataset):
             img = img.resize(self.shape)
 
         if os.path.getsize(labpath):
-            #torch.from_numpy(np.loadtxt(labpath))
-            tmp = torch.from_numpy(read_truths_args(labpath, 8.0/img.width))
+            tmp = torch.from_numpy(np.loadtxt(labpath))
+            #tmp = torch.from_numpy(read_truths_args(labpath, 8.0/img.width))
             #tmp = torch.from_numpy(read_truths(labpath))
             tmp = tmp.view(-1)
             tsz = tmp.numel()

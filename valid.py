@@ -59,10 +59,10 @@ def valid(datacfg, cfgfile, weightfile, outfile):
             boxes = batch_boxes[i]
             boxes = nms(boxes, nms_thresh)
             for box in boxes:
-                x1 = box[0] * width
-                y1 = box[1] * height
-                x2 = box[2] * width
-                y2 = box[3] * height
+                x1 = (box[0] - box[2]/2.0) * width
+                y1 = (box[1] - box[3]/2.0) * height
+                x2 = (box[0] + box[2]/2.0) * width
+                y2 = (box[1] + box[3]/2.0) * height
 
                 det_conf = box[4]
                 cls_conf = box[5]
