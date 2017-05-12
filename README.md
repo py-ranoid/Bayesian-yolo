@@ -30,9 +30,9 @@ layer     filters    size              input                output
    31 detection
 Loading weights from yolo.weights... Done!
 data/dog.jpg: Predicted in 0.014079 seconds.
-truck: 0.926668
-bicycle: 0.997449
-dog: 0.993459
+truck: 0.934711
+bicycle: 0.998013
+dog: 0.990524
 ```
 ---
 #### Real-Time Detection on a Webcam
@@ -83,9 +83,9 @@ python scripts/voc_eval.py results/comp4_det_test_
 ```
 mAP (we only use the top1 label of each box to compute mAP)
 ```
-YOLOvs544 0.7498 (paper: 78.6)
-YOLOvs416 0.7329 (paper: 76.8)
-TinyYolo416 0.5287 (paper: 57.1)
+YOLOvs544 0.7682 (paper: 78.6)
+YOLOvs416 0.7513 (paper: 76.8)
+TinyYolo416 0.5410 (paper: 57.1)
 ```
 ---
 #### Problems

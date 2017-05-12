@@ -79,7 +79,7 @@ def convert2cpu(gpu_matrix):
 def convert2cpu_long(gpu_matrix):
     return torch.LongTensor(gpu_matrix.size()).copy_(gpu_matrix)
 
-def get_region_boxes(output, conf_thresh, num_classes, anchors, num_anchors, only_objectness=1):
+def get_region_boxes(output, conf_thresh, num_classes, anchors, num_anchors, only_objectness=1, validation=False):
     anchor_step = len(anchors)/num_anchors
     if output.dim() == 3:
         output = output.unsqueeze(0)
@@ -121,6 +121,8 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors, num_anchors, onl
     ys = convert2cpu(ys)
     ws = convert2cpu(ws)
     hs = convert2cpu(hs)
+    if validation:
+        cls_confs = convert2cpu(cls_confs.view(-1, num_classes))
     t2 = time.time()
     for b in range(batch):
         boxes = []
@@ -142,6 +144,12 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors, num_anchors, onl
                         cls_max_conf = cls_max_confs[ind]
                         cls_max_id = cls_max_ids[ind]
                         box = [bcx/w, bcy/h, bw/w, bh/h, det_conf, cls_max_conf, cls_max_id]
+                        if (not only_objectness) and validation:
+                            for c in range(num_classes):
+                                tmp_conf = cls_confs[ind][c]
+                                if c != cls_max_id and det_confs[ind]*tmp_conf > conf_thresh:
+                                    box.append(tmp_conf)
+                                    box.append(c)
                         boxes.append(box)
         all_boxes.append(boxes)
     t3 = time.time()

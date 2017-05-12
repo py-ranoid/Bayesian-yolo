@@ -50,7 +50,7 @@ def valid(datacfg, cfgfile, weightfile, outfile):
         data = data.cuda()
         data = Variable(data, volatile = True)
         output = m(data).data
-        batch_boxes = get_region_boxes(output, conf_thresh, m.num_classes, m.anchors, m.num_anchors, 0)
+        batch_boxes = get_region_boxes(output, conf_thresh, m.num_classes, m.anchors, m.num_anchors, 0, 1)
         for i in range(output.size(0)):
             lineId = lineId + 1
             fileId = os.path.basename(valid_files[lineId]).split('.')[0]
@@ -65,10 +65,11 @@ def valid(datacfg, cfgfile, weightfile, outfile):
                 y2 = (box[1] + box[3]/2.0) * height
 
                 det_conf = box[4]
-                cls_conf = box[5]
-                cls_id = box[6]
-                prob =det_conf * cls_conf
-                fps[cls_id].write('%s %f %f %f %f %f\n' % (fileId, prob, x1, y1, x2, y2))
+                for j in range((len(box)-5)/2):
+                    cls_conf = box[5+2*j]
+                    cls_id = box[6+2*j]
+                    prob =det_conf * cls_conf
+                    fps[cls_id].write('%s %f %f %f %f %f\n' % (fileId, prob, x1, y1, x2, y2))
 
     for i in range(m.num_classes):
         fps[i].close()
