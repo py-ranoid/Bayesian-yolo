@@ -81,7 +81,7 @@ python train.py cfg/voc.data cfg/yolo-voc.cfg darknet19_448.conv.23
 python valid.py cfg/voc.data cfg/yolo-voc.cfg yolo-voc.weights
 python scripts/voc_eval.py results/comp4_det_test_
 ```
-mAP (we only use the top1 label of each box to compute mAP)
+mAP 
 ```
 YOLOvs544 0.7682 (paper: 78.6)
 YOLOvs416 0.7513 (paper: 76.8)
