@@ -143,8 +143,6 @@ def test(epoch):
         data = Variable(data, volatile=True)
         output = model(data).data
         all_boxes = get_region_boxes(output, conf_thresh, num_classes, anchors, num_anchors)
-        if output.size(0) == 1:
-            all_boxes = [all_boxes]
         for i in range(output.size(0)):
             boxes = all_boxes[i]
             boxes = nms(boxes, nms_thresh)

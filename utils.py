@@ -88,30 +88,46 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors, num_anchors, onl
     h = output.size(2)
     w = output.size(3)
 
-    if batch == 1:
-        t0 =time.time()
+    t0 = time.time()
+    all_boxes = []
+    output = output.view(batch*num_anchors, 5+num_classes, h*w).transpose(0,1).contiguous().view(5+num_classes, batch*num_anchors*h*w)
 
+    grid_x = torch.linspace(0, w-1, w).repeat(h,1).repeat(batch*num_anchors, 1, 1).view(batch*num_anchors*h*w).cuda()
+    grid_y = torch.linspace(0, h-1, h).repeat(w,1).t().repeat(batch*num_anchors, 1, 1).view(batch*num_anchors*h*w).cuda()
+    xs = torch.sigmoid(output[0]) + grid_x
+    ys = torch.sigmoid(output[1]) + grid_y
+
+    anchor_w = torch.Tensor(anchors).view(num_anchors, anchor_step).index_select(1, torch.LongTensor([0]))
+    anchor_h = torch.Tensor(anchors).view(num_anchors, anchor_step).index_select(1, torch.LongTensor([1]))
+    anchor_w = anchor_w.repeat(batch, 1).repeat(1, 1, h*w).view(batch*num_anchors*h*w).cuda()
+    anchor_h = anchor_h.repeat(batch, 1).repeat(1, 1, h*w).view(batch*num_anchors*h*w).cuda()
+    ws = torch.exp(output[2]) * anchor_w
+    hs = torch.exp(output[3]) * anchor_h
+
+    det_confs = torch.sigmoid(output[4])
+
+    cls_confs = torch.nn.Softmax()(Variable(output[5:5+num_classes].transpose(0,1))).data
+    cls_max_confs, cls_max_ids = torch.max(cls_confs, 1)
+    cls_max_confs = cls_max_confs.view(-1)
+    cls_max_ids = cls_max_ids.view(-1)
+    t1 = time.time()
+    
+    sz_hw = h*w
+    sz_hwa = sz_hw*num_anchors
+    det_confs = convert2cpu(det_confs)
+    cls_max_confs = convert2cpu(cls_max_confs)
+    cls_max_ids = convert2cpu_long(cls_max_ids)
+    xs = convert2cpu(xs)
+    ys = convert2cpu(ys)
+    ws = convert2cpu(ws)
+    hs = convert2cpu(hs)
+    t2 = time.time()
+    for b in range(batch):
         boxes = []
-        output = output.view(num_anchors, 5+num_classes, h*w).transpose(0,1).contiguous().view(5+num_classes, num_anchors*h*w)
-        xy = torch.sigmoid(output[0:2])
-        wh = torch.exp(output[2:4])
-        det_confs = torch.sigmoid(output[4])
-        cls_confs = torch.nn.Softmax()(Variable(output[5:5+num_classes].transpose(0,1))).data
-        cls_max_confs, cls_max_ids = torch.max(cls_confs, 1)
-        cls_max_confs = cls_max_confs.view(-1)
-        cls_max_ids = cls_max_ids.view(-1)
-        t1 =time.time()
-
-        det_confs = convert2cpu(det_confs)
-        xy = convert2cpu(xy)
-        wh = convert2cpu(wh)
-        cls_max_confs = convert2cpu(cls_max_confs)
-        cls_max_ids = convert2cpu_long(cls_max_ids)
-        t2 = time.time()
         for cy in range(h):
             for cx in range(w):
                 for i in range(num_anchors):
-                    ind = i*h*w + cy * w + cx
+                    ind = b*sz_hwa + i*sz_hw + cy*w + cx
                     det_conf =  det_confs[ind]
                     if only_objectness:
                         conf =  det_confs[ind]
@@ -119,87 +135,23 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors, num_anchors, onl
                         conf = det_confs[ind] * cls_max_confs[ind]
     
                     if conf > conf_thresh:
-                        bcx = xy[0][ind] + cx
-                        bcy = xy[1][ind] + cy
-                        bw = anchors[anchor_step*i] * wh[0][ind]
-                        bh = anchors[anchor_step*i+1] * wh[1][ind]
+                        bcx = xs[ind]
+                        bcy = ys[ind]
+                        bw = ws[ind]
+                        bh = hs[ind]
                         cls_max_conf = cls_max_confs[ind]
                         cls_max_id = cls_max_ids[ind]
                         box = [bcx/w, bcy/h, bw/w, bh/h, det_conf, cls_max_conf, cls_max_id]
                         boxes.append(box)
-        t3 = time.time()
-        if False:
-            print('---------------------------------')
-            print('matrix computation : %f' % (t1-t0))
-            print('        gpu to cpu : %f' % (t2-t1))
-            print('      boxes filter : %f' % (t3-t2))
-            print('---------------------------------')
-        return boxes
-    else:
-        t0 = time.time()
-        all_boxes = []
-        output = output.view(batch*num_anchors, 5+num_classes, h*w).transpose(0,1).contiguous().view(5+num_classes, batch*num_anchors*h*w)
-
-        grid_x = torch.linspace(0, w-1, w).repeat(h,1).repeat(batch*num_anchors, 1, 1).view(batch*num_anchors*h*w).cuda()
-        grid_y = torch.linspace(0, h-1, h).repeat(w,1).t().repeat(batch*num_anchors, 1, 1).view(batch*num_anchors*h*w).cuda()
-        xs = torch.sigmoid(output[0]) + grid_x
-        ys = torch.sigmoid(output[1]) + grid_y
-
-        anchor_w = torch.Tensor(anchors).view(num_anchors, anchor_step).index_select(1, torch.LongTensor([0]))
-        anchor_h = torch.Tensor(anchors).view(num_anchors, anchor_step).index_select(1, torch.LongTensor([1]))
-        anchor_w = anchor_w.repeat(batch, 1).repeat(1, 1, h*w).view(batch*num_anchors*h*w).cuda()
-        anchor_h = anchor_h.repeat(batch, 1).repeat(1, 1, h*w).view(batch*num_anchors*h*w).cuda()
-        ws = torch.exp(output[2]) * anchor_w
-        hs = torch.exp(output[3]) * anchor_h
-
-        det_confs = torch.sigmoid(output[4])
-
-        cls_confs = torch.nn.Softmax()(Variable(output[5:5+num_classes].transpose(0,1))).data
-        cls_max_confs, cls_max_ids = torch.max(cls_confs, 1)
-        cls_max_confs = cls_max_confs.view(-1)
-        cls_max_ids = cls_max_ids.view(-1)
-        t1 = time.time()
-        
-        sz_hw = h*w
-        sz_hwa = sz_hw*num_anchors
-        det_confs_cpu = torch.FloatTensor(det_confs.size()).copy_(det_confs)
-        cls_max_confs_cpu = torch.FloatTensor(cls_max_confs.size()).copy_(cls_max_confs)
-        cls_max_ids_cpu = torch.LongTensor(cls_max_ids.size()).copy_(cls_max_ids)
-        xs_cpu = torch.FloatTensor(xs.size()).copy_(xs)
-        ys_cpu = torch.FloatTensor(ys.size()).copy_(ys)
-        ws_cpu = torch.FloatTensor(ws.size()).copy_(ws)
-        hs_cpu = torch.FloatTensor(hs.size()).copy_(hs)
-        t2 = time.time()
-        for b in range(batch):
-            boxes = []
-            for cy in range(h):
-                for cx in range(w):
-                    for i in range(num_anchors):
-                        ind = b*sz_hwa + i*sz_hw + cy*w + cx
-                        det_conf =  det_confs_cpu[ind]
-                        if only_objectness:
-                            conf =  det_confs_cpu[ind]
-                        else:
-                            conf = det_confs_cpu[ind] * cls_max_confs_cpu[ind]
-        
-                        if conf > conf_thresh:
-                            bcx = xs_cpu[ind]
-                            bcy = ys_cpu[ind]
-                            bw = ws_cpu[ind]
-                            bh = hs_cpu[ind]
-                            cls_max_conf = cls_max_confs_cpu[ind]
-                            cls_max_id = cls_max_ids_cpu[ind]
-                            box = [bcx/w, bcy/h, bw/w, bh/h, det_conf, cls_max_conf, cls_max_id]
-                            boxes.append(box)
-            all_boxes.append(boxes)
-        t3 = time.time()
-        if False:
-            print('---------------------------------')
-            print('matrix computation : %f' % (t1-t0))
-            print('        gpu to cpu : %f' % (t2-t1))
-            print('      boxes filter : %f' % (t3-t2))
-            print('---------------------------------')
-        return all_boxes
+        all_boxes.append(boxes)
+    t3 = time.time()
+    if False:
+        print('---------------------------------')
+        print('matrix computation : %f' % (t1-t0))
+        print('        gpu to cpu : %f' % (t2-t1))
+        print('      boxes filter : %f' % (t3-t2))
+        print('---------------------------------')
+    return all_boxes
 
 def plot_boxes(img, boxes, savename, class_names=None):
     colors = torch.FloatTensor([[1,0,1],[0,0,1],[0,1,1],[0,1,0],[1,1,0],[1,0,0]]);
@@ -296,7 +248,7 @@ def do_detect(model, img, conf_thresh, nms_thresh, use_cuda=1):
     #print('')
     t3 = time.time()
 
-    boxes = get_region_boxes(output, conf_thresh, model.num_classes, model.anchors, model.num_anchors)
+    boxes = get_region_boxes(output, conf_thresh, model.num_classes, model.anchors, model.num_anchors)[0]
     #for j in range(len(boxes)):
     #    print(boxes[j])
     t4 = time.time()
