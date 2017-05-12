@@ -47,11 +47,11 @@ use_cuda      = True
 seed          = 22222
 eps           = 1e-5
 
-epoch_step    = 120
+epoch_step    = 120 # epochs to change lr
 lr_step       = 0.1
 num_workers   = 8
-save_interval = 15 # epoches
-dot_interval  = 70 # batches
+save_interval = 15  # epoches
+dot_interval  = 70  # batches
 
 # Test parameters
 conf_thresh   = 0.25
