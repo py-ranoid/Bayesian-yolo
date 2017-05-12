@@ -48,7 +48,7 @@ class listDataset(Dataset):
             elif self.seen < 12000*64*4:
                width = (random.randint(0,5) + 12)*32
                self.shape = (width, width)
-            elif self.seen < 12000*64*4:
+            elif self.seen < 16000*64*4:
                width = (random.randint(0,7) + 11)*32
                self.shape = (width, width)
             else: # self.seen < 20000*64*4:

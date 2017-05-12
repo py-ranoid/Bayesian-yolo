@@ -89,8 +89,7 @@ class RegionLoss(nn.Module):
         h    = output.index_select(2, Variable(torch.cuda.LongTensor([3]))).view(nB, nA, nH, nW)
         conf = F.sigmoid(output.index_select(2, Variable(torch.cuda.LongTensor([4]))).view(nB, nA, nH, nW))
         cls  = output.index_select(2, Variable(torch.linspace(5,5+nC-1,nC).long().cuda()))
-        cls  = cls.view(nB*nA, nC, nH*nW).transpose(0,1).contiguous()
-        cls  = cls.view(nC,nB*nA*nH*nW).transpose(0,1).contiguous().view(nB*nA*nH*nW, nC)
+        cls  = cls.view(nB*nA, nC, nH*nW).transpose(1,2).contiguous().view(nB*nA*nH*nW, nC)
 
         loss_x = self.coord_scale * nn.MSELoss(size_average=False)(x*mask, tx*mask) /nGT
         loss_y = self.coord_scale * nn.MSELoss(size_average=False)(y*mask, ty*mask) /nGT
