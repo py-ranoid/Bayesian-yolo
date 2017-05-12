@@ -40,10 +40,23 @@ max_batches   = int(net_options['max_batches'])
 learning_rate = float(net_options['learning_rate'])
 momentum      = float(net_options['momentum'])
 
+
+#Train parameters
 max_epochs    = max_batches*batch_size/nsamples+1
 use_cuda      = True
 seed          = 22222
 eps           = 1e-5
+
+epoch_step    = 120
+lr_step       = 0.1
+num_workers   = 8
+save_interval = 15 # epoches
+dot_interval  = 70 # batches
+
+# Test parameters
+conf_thresh   = 0.25
+nms_thresh    = 0.4
+iou_thresh    = 0.5
 
 ###############
 torch.manual_seed(seed)
@@ -57,7 +70,7 @@ model.load_weights(weightfile)
 model.print_network()
 init_epoch = model.seen / nsamples 
 
-kwargs = {'num_workers': 8, 'pin_memory': True} if use_cuda else {}
+kwargs = {'num_workers': num_workers, 'pin_memory': True} if use_cuda else {}
 test_loader = torch.utils.data.DataLoader(
     dataset.listDataset(testlist, shape=(model.width, model.height),
                    shuffle=False,
@@ -73,10 +86,10 @@ optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.1 ** (epoch // 120))
+    lr = learning_rate * (lr_step ** (epoch // epoch_step))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
-    if epoch % 120 == 0:
+    if epoch % epoch_step == 0:
         logging('lr = %f' % (lr))
 
 def train(epoch):
@@ -92,7 +105,7 @@ def train(epoch):
     model.train()
     adjust_learning_rate(optimizer, epoch)
     for batch_idx, (data, target) in enumerate(train_loader):
-        if (batch_idx+1) % 70 == 0:
+        if (batch_idx+1) % dot_interval == 0:
             sys.stdout.write('.')
 
         if use_cuda:
@@ -105,7 +118,7 @@ def train(epoch):
         loss.backward()
         optimizer.step()
     print('')
-    if (epoch+1) % 15 == 0:
+    if (epoch+1) % save_interval == 0:
         logging('save weights to %s/%06d.weights' % (backupdir, epoch+1))
         model.module.seen = (epoch + 1) * len(train_loader.dataset)
         model.module.save_weights('%s/%06d.weights' % (backupdir, epoch+1))
@@ -120,9 +133,6 @@ def test(epoch):
     num_classes = model.module.num_classes
     anchors     = model.module.anchors
     num_anchors = model.module.num_anchors
-    conf_thresh = 0.25
-    nms_thresh  = 0.4
-    iou_thresh  = 0.5
     total       = 0.0
     proposals   = 0.0
     correct     = 0.0
