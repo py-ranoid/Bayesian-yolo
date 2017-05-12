@@ -97,16 +97,16 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors, num_anchors, onl
         wh = torch.exp(output[2:4])
         det_confs = torch.sigmoid(output[4])
         cls_confs = torch.nn.Softmax()(Variable(output[5:5+num_classes].transpose(0,1))).data
-        cls_confs, cls_ids = torch.max(cls_confs, 1)
-        cls_confs = cls_confs.view(-1)
-        cls_ids = cls_ids.view(-1)
+        cls_max_confs, cls_max_ids = torch.max(cls_confs, 1)
+        cls_max_confs = cls_max_confs.view(-1)
+        cls_max_ids = cls_max_ids.view(-1)
         t1 =time.time()
 
         det_confs = convert2cpu(det_confs)
         xy = convert2cpu(xy)
         wh = convert2cpu(wh)
-        cls_confs = convert2cpu(cls_confs)
-        cls_ids = convert2cpu_long(cls_ids)
+        cls_max_confs = convert2cpu(cls_max_confs)
+        cls_max_ids = convert2cpu_long(cls_max_ids)
         t2 = time.time()
         for cy in range(h):
             for cx in range(w):
@@ -116,16 +116,16 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors, num_anchors, onl
                     if only_objectness:
                         conf =  det_confs[ind]
                     else:
-                        conf = det_confs[ind] * cls_confs[ind]
+                        conf = det_confs[ind] * cls_max_confs[ind]
     
                     if conf > conf_thresh:
                         bcx = xy[0][ind] + cx
                         bcy = xy[1][ind] + cy
                         bw = anchors[anchor_step*i] * wh[0][ind]
                         bh = anchors[anchor_step*i+1] * wh[1][ind]
-                        cls_conf = cls_confs[ind]
-                        cls_id = cls_ids[ind]
-                        box = [bcx/w, bcy/h, bw/w, bh/h, det_conf, cls_conf, cls_id]
+                        cls_max_conf = cls_max_confs[ind]
+                        cls_max_id = cls_max_ids[ind]
+                        box = [bcx/w, bcy/h, bw/w, bh/h, det_conf, cls_max_conf, cls_max_id]
                         boxes.append(box)
         t3 = time.time()
         if False:
@@ -155,16 +155,16 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors, num_anchors, onl
         det_confs = torch.sigmoid(output[4])
 
         cls_confs = torch.nn.Softmax()(Variable(output[5:5+num_classes].transpose(0,1))).data
-        cls_confs, cls_ids = torch.max(cls_confs, 1)
-        cls_confs = cls_confs.view(-1)
-        cls_ids = cls_ids.view(-1)
+        cls_max_confs, cls_max_ids = torch.max(cls_confs, 1)
+        cls_max_confs = cls_max_confs.view(-1)
+        cls_max_ids = cls_max_ids.view(-1)
         t1 = time.time()
         
         sz_hw = h*w
         sz_hwa = sz_hw*num_anchors
         det_confs_cpu = torch.FloatTensor(det_confs.size()).copy_(det_confs)
-        cls_confs_cpu = torch.FloatTensor(cls_confs.size()).copy_(cls_confs)
-        cls_ids_cpu = torch.LongTensor(cls_ids.size()).copy_(cls_ids)
+        cls_max_confs_cpu = torch.FloatTensor(cls_max_confs.size()).copy_(cls_max_confs)
+        cls_max_ids_cpu = torch.LongTensor(cls_max_ids.size()).copy_(cls_max_ids)
         xs_cpu = torch.FloatTensor(xs.size()).copy_(xs)
         ys_cpu = torch.FloatTensor(ys.size()).copy_(ys)
         ws_cpu = torch.FloatTensor(ws.size()).copy_(ws)
@@ -180,16 +180,16 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors, num_anchors, onl
                         if only_objectness:
                             conf =  det_confs_cpu[ind]
                         else:
-                            conf = det_confs_cpu[ind] * cls_confs_cpu[ind]
+                            conf = det_confs_cpu[ind] * cls_max_confs_cpu[ind]
         
                         if conf > conf_thresh:
                             bcx = xs_cpu[ind]
                             bcy = ys_cpu[ind]
                             bw = ws_cpu[ind]
                             bh = hs_cpu[ind]
-                            cls_conf = cls_confs_cpu[ind]
-                            cls_id = cls_ids_cpu[ind]
-                            box = [bcx/w, bcy/h, bw/w, bh/h, det_conf, cls_conf, cls_id]
+                            cls_max_conf = cls_max_confs_cpu[ind]
+                            cls_max_id = cls_max_ids_cpu[ind]
+                            box = [bcx/w, bcy/h, bw/w, bh/h, det_conf, cls_max_conf, cls_max_id]
                             boxes.append(box)
             all_boxes.append(boxes)
         t3 = time.time()
