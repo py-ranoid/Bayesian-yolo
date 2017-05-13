@@ -8,6 +8,13 @@ import numpy as np
 from torch.utils.data import Dataset
 from PIL import Image
 from utils import read_truths_args, read_truths
+from image import *
+
+jitter = 0.2
+hue = 0.1
+saturation = 1.5 
+exposure = 1.5
+
 
 
 class listDataset(Dataset):
@@ -34,11 +41,8 @@ class listDataset(Dataset):
     def __getitem__(self, index):
         assert index <= len(self), 'index range error'
         imgpath = self.lines[index].rstrip()
-        labpath = imgpath.replace('images', 'labels').replace('JPEGImages', 'labels').replace('.jpg', '.txt').replace('.png','.txt')
-        label = torch.zeros(50*5)
 
-        img = Image.open(imgpath).convert('RGB')
-        if self.train and index % 32== 0:
+        if self.train and index % 64== 0:
             if self.seen < 4000*64*4:
                width = 13*32
                self.shape = (width, width)
@@ -54,22 +58,10 @@ class listDataset(Dataset):
             else: # self.seen < 20000*64*4:
                width = (random.randint(0,9) + 10)*32
                self.shape = (width, width)
-
-        if self.shape:
-            img = img.resize(self.shape)
-
-        if os.path.getsize(labpath):
-            tmp = torch.from_numpy(np.loadtxt(labpath))
-            #tmp = torch.from_numpy(read_truths_args(labpath, 8.0/img.width))
-            #tmp = torch.from_numpy(read_truths(labpath))
-            tmp = tmp.view(-1)
-            tsz = tmp.numel()
-            #print('labpath = %s , tsz = %d' % (labpath, tsz))
-            if tsz > 50*5:
-                label = tmp[0:50*5]
-            elif tsz > 0:
-                label[0:tsz] = tmp
-
+        
+        img, labelnp = load_data_detection(imgpath, self.shape, jitter, hue, saturation, exposure )
+        label = torch.from_numpy(labelnp)
+        
         if self.transform is not None:
             img = self.transform(img)
 
