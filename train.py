@@ -1,8 +1,8 @@
 from __future__ import print_function
 import sys
-if len(sys.argv) < 4:
+if len(sys.argv) != 4:
     print('Usage:')
-    print('python train.py datacfg cfgfile weightfile [gpus]')
+    print('python train.py datacfg cfgfile weightfile')
     exit()
 
 import torch
@@ -26,10 +26,6 @@ from darknet import Darknet
 datacfg       = sys.argv[1]
 cfgfile       = sys.argv[2]
 weightfile    = sys.argv[3]
-if len(sys.argv) > 4:
-    gpus      = sys.argv[4]
-else:
-    gpus      = '0'
 
 data_options  = read_data_cfg(datacfg)
 net_options   = parse_cfg(cfgfile)[0]
@@ -38,6 +34,7 @@ trainlist     = data_options['train']
 testlist      = data_options['valid']
 backupdir     = data_options['backup']
 nsamples      = file_lines(trainlist)
+gpus          = data_option['gpus']
 
 batch_size    = int(net_options['batch'])
 max_batches   = int(net_options['max_batches'])
