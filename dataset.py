@@ -10,13 +10,6 @@ from PIL import Image
 from utils import read_truths_args, read_truths
 from image import *
 
-jitter = 0.2
-hue = 0.1
-saturation = 1.5 
-exposure = 1.5
-
-
-
 class listDataset(Dataset):
 
     def __init__(self, root, shape=None, shuffle=True, transform=None, target_transform=None, train=False, seen=0):
@@ -59,8 +52,13 @@ class listDataset(Dataset):
                width = (random.randint(0,9) + 10)*32
                self.shape = (width, width)
         
-        img, labelnp = load_data_detection(imgpath, self.shape, jitter, hue, saturation, exposure )
-        label = torch.from_numpy(labelnp)
+        jitter = 0.2
+        hue = 0.1
+        saturation = 1.5 
+        exposure = 1.5
+
+        img, label = load_data_detection(imgpath, self.shape, jitter, hue, saturation, exposure)
+        label = torch.from_numpy(label)
         
         if self.transform is not None:
             img = self.transform(img)
