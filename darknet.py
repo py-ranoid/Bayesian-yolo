@@ -47,7 +47,15 @@ class GlobalAvgPool2d(nn.Module):
         x = x.view(N, C)
         return x
 
-# support route and reorg
+# for route and shortcut
+class EmptyModule(nn.Module):
+    def __init__(self):
+        super(EmptyModule, self).__init__()
+
+    def forward(self, x):
+        return x
+
+# support route shortcut and reorg
 class Darknet(nn.Module):
     def __init__(self, cfgfile):
         super(Darknet, self).__init__()
@@ -91,6 +99,18 @@ class Darknet(nn.Module):
                     x2 = outputs[layers[1]]
                     x = torch.cat((x1,x2),1)
                     outputs[ind] = x
+            elif block['type'] == 'shortcut':
+                from_layer = int(block['from'])
+                activation = block['activation']
+                from_layer = from_layer if from_layer > 0 else from_layer + ind
+                x1 = outputs[from_layer]
+                x2 = outputs[ind-1]
+                x  = x1 + x2
+                if activation == 'leaky':
+                    x = F.leaky_relu(x, 0.1, inplace=True)
+                elif activation == 'relu':
+                    x = F.relu(x, inplace=True)
+                outputs[ind] = x
             elif block['type'] == 'region':
                 continue
                 if self.loss:
@@ -134,6 +154,8 @@ class Darknet(nn.Module):
                     model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, pad))
                 if activation == 'leaky':
                     model.add_module('leaky{0}'.format(conv_id), nn.LeakyReLU(0.1, inplace=True))
+                elif activation == 'relu':
+                    model.add_module('relu{0}'.format(conv_id), nn.ReLU(inplace=True))
                 prev_filters = filters
                 out_filters.append(prev_filters)
                 models.append(model)
@@ -178,7 +200,12 @@ class Darknet(nn.Module):
                     assert(layers[0] == ind - 1)
                     prev_filters = out_filters[layers[0]] + out_filters[layers[1]]
                 out_filters.append(prev_filters)
-                models.append(nn.ReLU())
+                models.append(EmptyModule())
+            elif block['type'] == 'shortcut':
+                ind = len(models)
+                prev_filters = out_filters[ind-1]
+                out_filters.append(prev_filters)
+                models.append(EmptyModule())
             elif block['type'] == 'region':
                 loss = RegionLoss()
                 anchors = block['anchors'].split(',')
@@ -226,6 +253,8 @@ class Darknet(nn.Module):
                 pass
             elif block['type'] == 'route':
                 pass
+            elif block['type'] == 'shortcut':
+                pass
             elif block['type'] == 'region':
                 pass
             elif block['type'] == 'avgpool':
@@ -262,6 +291,8 @@ class Darknet(nn.Module):
             elif block['type'] == 'reorg':
                 pass
             elif block['type'] == 'route':
+                pass
+            elif block['type'] == 'shortcut':
                 pass
             elif block['type'] == 'region':
                 pass

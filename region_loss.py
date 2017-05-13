@@ -3,9 +3,16 @@ import math
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from utils import bbox_iou
+from utils import sigmoid, bbox_iou, convert2cpu
 
-def build_targets(target, anchors, num_anchors, nH, nW):
+def get_region_box(pred_boxes, b, n, j, i, nH, nW, anchors, anchor_step):
+    x = i + sigmoid(pred_boxes[b][n][0][j][i])
+    y = j + sigmoid(pred_boxes[b][n][1][j][i])
+    w = math.exp(pred_boxes[b][n][2][j][i]) * anchors[anchor_step*n]
+    h = math.exp(pred_boxes[b][n][3][j][i]) * anchors[anchor_step*n+1]
+    return [x,y,w,h]
+
+def build_targets(target, anchors, num_anchors, nH, nW, pred_boxes):
     nB = target.size(0)
     nA = num_anchors
     anchor_step = len(anchors)/num_anchors
@@ -37,12 +44,16 @@ def build_targets(target, anchors, num_anchors, nH, nW):
                     best_iou = iou
                     best_n = n
 
+            gt_box[0] = target[b][t*5+1] * nW
+            gt_box[1] = target[b][t*5+2] * nH
+            pred_box = get_region_box(pred_boxes, b, best_n, j, i, nH, nW, anchors, anchor_step)
+
             mask[b][best_n][j][i] = 1
             tx[b][best_n][j][i] = target[b][t*5+1] * nW - i
             ty[b][best_n][j][i] = target[b][t*5+2] * nH - j
             tw[b][best_n][j][i] = math.log(w/anchors[anchor_step*best_n])
             th[b][best_n][j][i] = math.log(h/anchors[anchor_step*best_n+1])
-            tconf[b][best_n][j][i] = best_iou
+            tconf[b][best_n][j][i] = bbox_iou(gt_box, pred_box, x1y1x2y2=False) #best_iou
             tcls[b][best_n][j][i] = target[b][t*5]
 
     return nGT, mask, tx, ty, tw, th, tconf, tcls
@@ -67,7 +78,11 @@ class RegionLoss(nn.Module):
         nH = output.data.size(2)
         nW = output.data.size(3)
 
-        nGT, mask, tx, ty, tw, th, tconf,tcls = build_targets(target.data, self.anchors, self.num_anchors, nH, nW)
+        output   = output.view(nB, nA, (5+nC), nH, nW)
+        pred_boxes = output.index_select(2, Variable(torch.cuda.LongTensor([0,1,2,3])))
+        pred_boxes = convert2cpu(pred_boxes.data)
+
+        nGT, mask, tx, ty, tw, th, tconf,tcls = build_targets(target.data, self.anchors, self.num_anchors, nH, nW, pred_boxes)
         scale_mask = self.noobject_scale * (1-mask) + self.object_scale * mask
         cls_mask = torch.stack([mask.view(-1)]*nC, 1)
 
@@ -80,8 +95,6 @@ class RegionLoss(nn.Module):
         mask       = Variable(mask.cuda())
         scale_mask = Variable(scale_mask.cuda())
         cls_mask   = Variable(cls_mask.cuda())
-
-        output = output.view(nB, nA, (5+nC), nH, nW)
 
         x    = F.sigmoid(output.index_select(2, Variable(torch.cuda.LongTensor([0]))).view(nB, nA, nH, nW))
         y    = F.sigmoid(output.index_select(2, Variable(torch.cuda.LongTensor([1]))).view(nB, nA, nH, nW))
