@@ -83,8 +83,8 @@ python scripts/voc_eval.py results/comp4_det_test_
 ```
 mAP 
 ```
-YOLOvs544 0.7682 (paper: 78.6)
-YOLOvs416 0.7513 (paper: 76.8)
+YOLOv2544 0.7682 (paper: 78.6)
+YOLOv2416 0.7513 (paper: 76.8)
 TinyYolo416 0.5410 (paper: 57.1)
 ```
 ---
