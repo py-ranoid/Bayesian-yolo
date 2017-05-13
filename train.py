@@ -1,8 +1,8 @@
 from __future__ import print_function
 import sys
-if len(sys.argv) != 4:
+if len(sys.argv) < 4:
     print('Usage:')
-    print('python train.py datacfg cfgfile weightfile')
+    print('python train.py datacfg cfgfile weightfile [gpus]')
     exit()
 
 import torch
@@ -26,6 +26,10 @@ from darknet import Darknet
 datacfg       = sys.argv[1]
 cfgfile       = sys.argv[2]
 weightfile    = sys.argv[3]
+if len(sys.argv) > 4:
+    gpus      = sys.argv[4]
+else:
+    gpus      = '0'
 
 data_options  = read_data_cfg(datacfg)
 net_options   = parse_cfg(cfgfile)[0]
@@ -61,6 +65,7 @@ iou_thresh    = 0.5
 ###############
 torch.manual_seed(seed)
 if use_cuda:
+    os.environ['CUDA_VISIBLE_DEVICES'] = gpus
     torch.cuda.manual_seed(seed)
 
 model       = Darknet(cfgfile)
