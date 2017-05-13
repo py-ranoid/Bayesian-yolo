@@ -38,7 +38,7 @@ class listDataset(Dataset):
         label = torch.zeros(50*5)
 
         img = Image.open(imgpath).convert('RGB')
-        if self.train and index % 64 == 0:
+        if self.train and index % 32== 0:
             if self.seen < 4000*64*4:
                width = 13*32
                self.shape = (width, width)
