@@ -6,10 +6,10 @@ from torch.autograd import Variable
 from utils import sigmoid, bbox_iou, convert2cpu
 
 def get_region_box(pred_boxes, b, n, j, i, nH, nW, anchors, anchor_step):
-    x = (i + sigmoid(pred_boxes[b][n][0][j][i]))/nW;
-    y = (j + sigmoid(pred_boxes[b][n][1][j][i]))/nH;
-    w = math.exp(pred_boxes[b][n][2][j][i]) * anchors[anchor_step*n]/nW
-    h = math.exp(pred_boxes[b][n][3][j][i]) * anchors[anchor_step*n+1]/nH
+    x = i + sigmoid(pred_boxes[b][n][0][j][i])
+    y = j + sigmoid(pred_boxes[b][n][1][j][i])
+    w = math.exp(pred_boxes[b][n][2][j][i]) * anchors[anchor_step*n]
+    h = math.exp(pred_boxes[b][n][3][j][i]) * anchors[anchor_step*n+1]
     return [x,y,w,h]
 
 def build_targets(target, anchors, num_anchors, nH, nW, pred_boxes):

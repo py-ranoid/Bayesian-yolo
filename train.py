@@ -34,7 +34,7 @@ trainlist     = data_options['train']
 testlist      = data_options['valid']
 backupdir     = data_options['backup']
 nsamples      = file_lines(trainlist)
-gpus          = data_option['gpus']
+gpus          = data_options['gpus']  # e.g. 0,1,2,3
 
 batch_size    = int(net_options['batch'])
 max_batches   = int(net_options['max_batches'])
