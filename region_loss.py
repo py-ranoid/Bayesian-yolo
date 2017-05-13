@@ -53,7 +53,7 @@ def build_targets(target, anchors, num_anchors, nH, nW, pred_boxes):
             ty[b][best_n][j][i] = target[b][t*5+2] * nH - j
             tw[b][best_n][j][i] = math.log(w/anchors[anchor_step*best_n])
             th[b][best_n][j][i] = math.log(h/anchors[anchor_step*best_n+1])
-            tconf[b][best_n][j][i] = bbox_iou(gt_box, pred_box, x1y1x2y2=False) #best_iou
+            tconf[b][best_n][j][i] = bbox_iou(gt_box, pred_box, x1y1x2y2=False) # best_iou
             tcls[b][best_n][j][i] = target[b][t*5]
 
     return nGT, mask, tx, ty, tw, th, tconf, tcls

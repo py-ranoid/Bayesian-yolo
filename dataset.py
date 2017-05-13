@@ -25,8 +25,6 @@ class listDataset(Dataset):
        self.train = train
        self.shape = shape
        self.seen = seen
-       #if self.train:
-       #    print('init seen to %d' % (self.seen))
 
     def __len__(self):
         return self.nSamples
