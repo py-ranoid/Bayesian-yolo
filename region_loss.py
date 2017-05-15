@@ -12,17 +12,38 @@ def get_region_box(pred_boxes, b, n, j, i, nH, nW, anchors, anchor_step):
     h = math.exp(pred_boxes[b][n][3][j][i]) * anchors[anchor_step*n+1]
     return [x,y,w,h]
 
-def build_targets(target, anchors, num_anchors, nH, nW, pred_boxes):
+def build_targets(pred_boxes, target, anchors, num_anchors, nH, nW, noobject_scale, object_scale, sil_thresh):
     nB = target.size(0)
     nA = num_anchors
     anchor_step = len(anchors)/num_anchors
-    mask  = torch.zeros(nB, nA, nH, nW)
-    tx    = torch.zeros(nB, nA, nH, nW) 
-    ty    = torch.zeros(nB, nA, nH, nW) 
-    tw    = torch.zeros(nB, nA, nH, nW) 
-    th    = torch.zeros(nB, nA, nH, nW) 
-    tconf = torch.zeros(nB, nA, nH, nW)
-    tcls  = torch.zeros(nB, nA, nH, nW) 
+    scale_mask = torch.ones(nB, nA, nH, nW) * noobject_scale
+    mask       = torch.zeros(nB, nA, nH, nW)
+    tx         = torch.zeros(nB, nA, nH, nW) 
+    ty         = torch.zeros(nB, nA, nH, nW) 
+    tw         = torch.zeros(nB, nA, nH, nW) 
+    th         = torch.zeros(nB, nA, nH, nW) 
+    tconf      = torch.zeros(nB, nA, nH, nW)
+    tcls       = torch.zeros(nB, nA, nH, nW) 
+
+    #sil_thresh = 0.6
+    for b in range(nB):
+        for j in range(nH):
+            for i in range(nW):
+                for n in range(nA):
+                    pred_box = get_region_box(pred_boxes, b,n,j,i,nH,nW,anchors, anchor_step)
+                    best_iou = 0
+                    for t in range(50):
+                        if target[b][t*5+1] == 0:
+                            break
+                        gx = target[b][t*5+1]*nW
+                        gy = target[b][t*5+2]*nH
+                        gw = target[b][t*5+3]*nW
+                        gh = target[b][t*5+4]*nH
+                        gt_box = [gx, gy, gw, gh]
+                        iou = bbox_iou(pred_box, gt_box, x1y1x2y2=False)
+                        best_iou = max(iou, best_iou)
+                    if best_iou > sil_thresh:
+                        scale_mask[b][n][j][i] = 0
 
     nGT = 0
     for b in range(nB):
@@ -49,14 +70,15 @@ def build_targets(target, anchors, num_anchors, nH, nW, pred_boxes):
             pred_box = get_region_box(pred_boxes, b, best_n, j, i, nH, nW, anchors, anchor_step)
 
             mask[b][best_n][j][i] = 1
+            scale_mask[b][best_n][j][i] = object_scale
             tx[b][best_n][j][i] = target[b][t*5+1] * nW - i
             ty[b][best_n][j][i] = target[b][t*5+2] * nH - j
             tw[b][best_n][j][i] = math.log(w/anchors[anchor_step*best_n])
             th[b][best_n][j][i] = math.log(h/anchors[anchor_step*best_n+1])
-            tconf[b][best_n][j][i] = bbox_iou(gt_box, pred_box, x1y1x2y2=False) # best_iou
+            tconf[b][best_n][j][i] = best_iou # bbox_iou(gt_box, pred_box, x1y1x2y2=False) # best_iou
             tcls[b][best_n][j][i] = target[b][t*5]
 
-    return nGT, mask, tx, ty, tw, th, tconf, tcls
+    return nGT, mask, scale_mask, tx, ty, tw, th, tconf, tcls
 
 class RegionLoss(nn.Module):
     def __init__(self, num_classes=0, anchors=[], num_anchors=1):
@@ -69,6 +91,7 @@ class RegionLoss(nn.Module):
         self.noobject_scale = 1
         self.object_scale = 5
         self.class_scale = 1
+        self.thresh = 0.6
 
     def forward(self, output, target):
         #output : BxAs*(4+1+num_classes)*H*W
@@ -82,8 +105,8 @@ class RegionLoss(nn.Module):
         pred_boxes = output.index_select(2, Variable(torch.cuda.LongTensor([0,1,2,3])))
         pred_boxes = convert2cpu(pred_boxes.data)
 
-        nGT, mask, tx, ty, tw, th, tconf,tcls = build_targets(target.data, self.anchors, self.num_anchors, nH, nW, pred_boxes)
-        scale_mask = self.noobject_scale * (1-mask) + self.object_scale * mask
+        nGT, mask, scale_mask, tx, ty, tw, th, tconf,tcls = build_targets(pred_boxes, target.data, self.anchors, num_anchors, \
+                                                                   nH, nW, self.noobject_scale, self.object_scale, self.thresh)
         cls_mask = torch.stack([mask.view(-1)]*nC, 1)
 
         tx    = Variable(tx.cuda())
