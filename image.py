@@ -77,30 +77,42 @@ def data_augmentation(img, shape, jitter, hue, saturation, exposure):
     
     return img, flip, dx,dy,sx,sy 
 
-def fill_truth_detection(labpath, flip, dx, dy, sx, sy):
+def fill_truth_detection(labpath, w, h, flip, dx, dy, sx, sy):
     max_boxes = 50
-    label = np.zeros(max_boxes*5)
+    label = np.zeros((max_boxes,5))
     if os.path.getsize(labpath):
         bs = np.loadtxt(labpath)
         if bs is None:
             return label
         bs = np.reshape(bs, (-1, 5))
+        cc = 0
         for i in range(bs.shape[0]):
-            bs[i][1] = min(0.999, max(0, bs[i][1] * sx - dx)) 
-            bs[i][2] = min(0.999, max(0, bs[i][2] * sy - dy)) 
-            bs[i][3] = min(0.999, max(0, bs[i][3] * sx))
-            bs[i][4] = min(0.999, max(0, bs[i][4] * sy))
-        
+            x1 = bs[i][1] - bs[i][3]/2
+            y1 = bs[i][2] - bs[i][4]/2
+            x2 = bs[i][1] + bs[i][3]/2
+            y2 = bs[i][2] + bs[i][4]/2
+            
+            x1 = min(0.999, max(0, x1 * sx - dx)) 
+            y1 = min(0.999, max(0, y1 * sy - dy)) 
+            x2 = min(0.999, max(0, x2 * sx - dx))
+            y2 = min(0.999, max(0, y2 * sy - dy))
+            
+            bs[i][1] = (x1 + x2)/2
+            bs[i][2] = (y1 + y2)/2
+            bs[i][3] = (x2 - x1)
+            bs[i][4] = (y2 - y1)
+
             if flip:
                 bs[i][1] =  0.999 - bs[i][1] 
-        
-        tmp = np.reshape(bs, (-1))
-        tsz = tmp.shape[0]
-        #print('labpath = %s , tsz = %d' % (labpath, tsz))
-        if tsz > max_boxes*5:
-            label = tmp[0 : max_boxes*5]
-        elif tsz > 0:
-            label[0:tsz] = tmp
+            
+            if bs[i][3] < 4./w or bs[i][4] < 4./h:
+                continue
+            label[cc] = bs[i]
+            cc += 1
+            if cc >= 50:
+                break
+
+    label = np.reshape(label, (-1))
     return label
 
 def load_data_detection(imgpath, shape, jitter, hue, saturation, exposure):
@@ -109,6 +121,5 @@ def load_data_detection(imgpath, shape, jitter, hue, saturation, exposure):
     ## data augmentation
     img = Image.open(imgpath).convert('RGB')
     img,flip,dx,dy,sx,sy = data_augmentation(img, shape, jitter, hue, saturation, exposure)
-    
-    label = fill_truth_detection(labpath, flip, dx, dy, 1./sx, 1./sy)
+    label = fill_truth_detection(labpath, img.width, img.height, flip, dx, dy, 1./sx, 1./sy)
     return img,label
