@@ -52,7 +52,7 @@ eps           = 1e-5
 epoch_step    = 50 # epochs to change lr
 lr_step       = 0.1
 num_workers   = 10
-save_interval = 1  # epoches
+save_interval = 10  # epoches
 dot_interval  = 70  # batches
 
 # Test parameters
@@ -112,8 +112,8 @@ def train(epoch):
     avg_time = torch.zeros(9)
     for batch_idx, (data, target) in enumerate(train_loader):
         t2 = time.time()
-        #if (batch_idx+1) % dot_interval == 0:
-        #    sys.stdout.write('.')
+        if (batch_idx+1) % dot_interval == 0:
+            sys.stdout.write('.')
 
         if use_cuda:
             data = data.cuda()
@@ -131,7 +131,7 @@ def train(epoch):
         t8 = time.time()
         optimizer.step()
         t9 = time.time()
-        if True and batch_idx > 1:
+        if False and batch_idx > 1:
             avg_time[0] = avg_time[0] + (t2-t1)
             avg_time[1] = avg_time[1] + (t3-t2)
             avg_time[2] = avg_time[2] + (t4-t3)
