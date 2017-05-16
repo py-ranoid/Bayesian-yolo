@@ -21,6 +21,7 @@ from utils import *
 from cfg import parse_cfg
 from region_loss import RegionLoss
 from darknet import Darknet
+from models.tiny_yolo import TinyYoloNet
 
 
 # Training settings
@@ -66,7 +67,7 @@ if use_cuda:
     os.environ['CUDA_VISIBLE_DEVICES'] = gpus
     torch.cuda.manual_seed(seed)
 
-model       = Darknet(cfgfile)
+model       = TinyYoloNet() #Darknet(cfgfile)
 region_loss = model.loss
 
 model.load_weights(weightfile)

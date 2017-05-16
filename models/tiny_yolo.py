@@ -4,15 +4,20 @@ import torch.nn.functional as F
 from collections import OrderedDict
 from cfg import *
 from darknet import MaxPoolStride1
+from region_loss import RegionLoss
 
 class TinyYoloNet(nn.Module):
     def __init__(self):
         super(TinyYoloNet, self).__init__()
+        self.seen = 0
         self.num_classes = 20
         self.anchors = [1.08,1.19,  3.42,4.41,  6.63,11.38,  9.42,5.11,  16.62,10.52]
         self.num_anchors = len(self.anchors)/2
         num_output = (5+self.num_classes)*self.num_anchors
+        self.width = 160
+        self.height = 160
 
+        self.loss = RegionLoss(self.num_classes, self.anchors, self.num_anchors)
         self.cnn = nn.Sequential(OrderedDict([
             # conv1
             ('conv1', nn.Conv2d( 3, 16, 3, 1, 1, bias=False)),
@@ -68,7 +73,10 @@ class TinyYoloNet(nn.Module):
         x = self.cnn(x)
         return x
 
-    def load_darknet_weights(self, path):
+    def print_network(self):
+        print(self)
+
+    def load_weights(self, path):
         #buf = np.fromfile('tiny-yolo-voc.weights', dtype = np.float32)
         buf = np.fromfile(path, dtype = np.float32)
         start = 4

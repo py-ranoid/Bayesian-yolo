@@ -52,13 +52,13 @@ def build_targets(pred_boxes, target, anchors, num_anchors, nH, nW, noobject_sca
             gh = target[b][t*5+4]*nH
             gt_box = [0, 0, gw, gh]
             for n in xrange(nA):
-                ax = anchors[anchor_step*n+2]
-                ay = anchors[anchor_step*n+3]
                 aw = anchors[anchor_step*n]
                 ah = anchors[anchor_step*n+1]
                 anchor_box = [0, 0, aw, ah]
                 iou  = bbox_iou(anchor_box, gt_box, x1y1x2y2=False)
                 if anchor_step == 4:
+                    ax = anchors[anchor_step*n+2]
+                    ay = anchors[anchor_step*n+3]
                     dist = pow(((gi+ax) - gx), 2) + pow(((gj+ay) - gy), 2)
                 if iou > best_iou:
                     best_iou = iou
