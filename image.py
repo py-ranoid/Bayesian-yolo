@@ -105,7 +105,7 @@ def fill_truth_detection(labpath, w, h, flip, dx, dy, sx, sy):
             if flip:
                 bs[i][1] =  0.999 - bs[i][1] 
             
-            if bs[i][3] < 4./w or bs[i][4] < 4./h:
+            if bs[i][3] < 8./w or bs[i][4] < 8./h:
                 continue
             label[cc] = bs[i]
             cc += 1

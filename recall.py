@@ -44,7 +44,7 @@ def eval_list(cfgfile, weightfile, imglist):
 
         img = Image.open(img_path).convert('RGB').resize((eval_wid, eval_hei))
         boxes = do_detect(m, img, conf_thresh, nms_thresh, use_cuda)
-        if True:
+        if False:
             savename = "tmp/%06d.jpg" % (lineId)
             print("save %s" % savename)
             plot_boxes(img, boxes, savename)
@@ -65,10 +65,10 @@ def eval_list(cfgfile, weightfile, imglist):
                 avg_iou += best_iou
                 correct = correct+1
 
-        precision = 1.0*correct/proposals
-        recall = 1.0*correct/total
-        fscore = 2.0*precision*recall/(precision+recall)
-        print("%d IOU: %f, Recal: %f, Precision: %f, Fscore: %f\n" % (lineId-1, avg_iou/correct, recall, precision, fscore))
+    precision = 1.0*correct/proposals
+    recall = 1.0*correct/total
+    fscore = 2.0*precision*recall/(precision+recall)
+    print("%d IOU: %f, Recal: %f, Precision: %f, Fscore: %f\n" % (lineId-1, avg_iou/correct, recall, precision, fscore))
 
 if __name__ == '__main__':
     import sys

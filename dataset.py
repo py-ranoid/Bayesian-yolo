@@ -33,31 +33,68 @@ class listDataset(Dataset):
         assert index <= len(self), 'index range error'
         imgpath = self.lines[index].rstrip()
 
-        if self.train and index % 64== 0:
+#        if self.train and index % 64== 0:
+#            if self.seen < 4000*64*4:
+#               width = 13*32
+#               self.shape = (width, width)
+#            elif self.seen < 8000*64*4:
+#               width = (random.randint(0,3) + 13)*32
+#               self.shape = (width, width)
+#            elif self.seen < 12000*64*4:
+#               width = (random.randint(0,5) + 12)*32
+#               self.shape = (width, width)
+#            elif self.seen < 16000*64*4:
+#               width = (random.randint(0,7) + 11)*32
+#               self.shape = (width, width)
+#            else: # self.seen < 20000*64*4:
+#               width = (random.randint(0,9) + 10)*32
+#               self.shape = (width, width)
+
+        if self.train and index % 64 == 0:
             if self.seen < 4000*64*4:
-               width = 13*32
+               width = (random.randint(0,2)*2 + 13)*32
                self.shape = (width, width)
             elif self.seen < 8000*64*4:
-               width = (random.randint(0,3) + 13)*32
+               width = (random.randint(0,4)*2 + 9)*32
                self.shape = (width, width)
             elif self.seen < 12000*64*4:
-               width = (random.randint(0,5) + 12)*32
+               width = (random.randint(0,6)*2 + 5)*32
                self.shape = (width, width)
-            elif self.seen < 16000*64*4:
-               width = (random.randint(0,7) + 11)*32
+            elif self.seen < 12000*64*4:
+               width = (random.randint(0,12) + 5)*32
                self.shape = (width, width)
             else: # self.seen < 20000*64*4:
-               width = (random.randint(0,9) + 10)*32
+               width = (random.randint(0,16) + 3)*32
                self.shape = (width, width)
+
         
         jitter = 0.2
         hue = 0.1
         saturation = 1.5 
         exposure = 1.5
 
-        img, label = load_data_detection(imgpath, self.shape, jitter, hue, saturation, exposure)
-        label = torch.from_numpy(label)
-        
+        if True:
+            img, label = load_data_detection(imgpath, self.shape, jitter, hue, saturation, exposure)
+            label = torch.from_numpy(label)
+        else:
+            img = Image.open(imgpath).convert('RGB')
+            if self.shape:
+                img = img.resize(self.shape)
+    
+            labpath = imgpath.replace('images', 'labels').replace('JPEGImages', 'labels').replace('.jpg', '.txt').replace('.png','.txt')
+            label = torch.zeros(50*5)
+            if os.path.getsize(labpath):
+                tmp = torch.from_numpy(np.loadtxt(labpath))
+                #tmp = torch.from_numpy(read_truths_args(labpath, 8.0/img.width))
+                #tmp = torch.from_numpy(read_truths(labpath))
+                tmp = tmp.view(-1)
+                tsz = tmp.numel()
+                #print('labpath = %s , tsz = %d' % (labpath, tsz))
+                if tsz > 50*5:
+                    label = tmp[0:50*5]
+                elif tsz > 0:
+                    label[0:tsz] = tmp
+
         if self.transform is not None:
             img = self.transform(img)
 
