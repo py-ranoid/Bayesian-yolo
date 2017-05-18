@@ -139,17 +139,17 @@ class RegionLoss(nn.Module):
         tconf = Variable(tconf.cuda())
         tcls  = Variable(tcls.view(-1).long().cuda())
         mask       = Variable(mask.cuda())
-        scale_mask = Variable(scale_mask.cuda())
+        scale_mask = Variable(scale_mask.cuda().sqrt())
         cls_mask   = Variable(cls_mask.cuda())
 
         t3 = time.time()
 
-        loss_x = self.coord_scale * nn.MSELoss(size_average=False)(x*mask, tx*mask) /nGT
-        loss_y = self.coord_scale * nn.MSELoss(size_average=False)(y*mask, ty*mask) /nGT
-        loss_w = self.coord_scale * nn.MSELoss(size_average=False)(w*mask, tw*mask) /nGT
-        loss_h = self.coord_scale * nn.MSELoss(size_average=False)(h*mask, th*mask) /nGT
-        loss_conf = nn.MSELoss(size_average=False)(conf*scale_mask, tconf*scale_mask) /nGT
-        loss_cls = self.class_scale * nn.CrossEntropyLoss(size_average=False)(cls*cls_mask, tcls) /nGT
+        loss_x = self.coord_scale * nn.MSELoss(size_average=False)(x*mask, tx*mask)/2.0
+        loss_y = self.coord_scale * nn.MSELoss(size_average=False)(y*mask, ty*mask)/2.0
+        loss_w = self.coord_scale * nn.MSELoss(size_average=False)(w*mask, tw*mask)/2.0
+        loss_h = self.coord_scale * nn.MSELoss(size_average=False)(h*mask, th*mask)/2.0
+        loss_conf = nn.MSELoss(size_average=False)(conf*scale_mask, tconf*scale_mask)/2.0
+        loss_cls = self.class_scale * nn.CrossEntropyLoss(size_average=False)(cls*cls_mask, tcls)
         loss = loss_x + loss_y + loss_w + loss_h + loss_conf + loss_cls
         t4 = time.time()
         if False:
