@@ -42,16 +42,14 @@ batch_size    = int(net_options['batch'])
 max_batches   = int(net_options['max_batches'])
 learning_rate = float(net_options['learning_rate'])
 momentum      = float(net_options['momentum'])
-
+steps         = [float(step) for step in net_options['steps'].split(',')]
+scales        = [float(scale) for scale in net_options['scales'].split(',')]
 
 #Train parameters
 max_epochs    = max_batches*batch_size/nsamples+1
 use_cuda      = True
 seed          = 22222
 eps           = 1e-5
-
-epoch_step    = 50 # epochs to change lr
-lr_step       = 0.1
 num_workers   = 10
 save_interval = 10  # epoches
 dot_interval  = 70  # batches
@@ -73,7 +71,8 @@ region_loss = model.loss
 model.load_weights(weightfile)
 model.print_network()
 region_loss.seen = model.seen
-init_epoch = model.seen / nsamples 
+cur_batch  = model.seen/batch_size
+init_epoch = model.seen/nsamples 
 
 kwargs = {'num_workers': num_workers, 'pin_memory': True} if use_cuda else {}
 test_loader = torch.utils.data.DataLoader(
@@ -89,15 +88,23 @@ if use_cuda:
 
 optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
 
-def adjust_learning_rate(optimizer, epoch):
+def adjust_learning_rate(optimizer, batch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (lr_step ** (epoch // epoch_step))
+    lr = learning_rate
+    for i in range(len(steps)):
+        scale = scales[i] if i < len(scales) else 1
+        if batch >= steps[i]:
+            lr = lr * scale
+            if batch == steps[i]:
+                break
+        else:
+            break
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
-    if epoch % epoch_step == 0:
-        logging('lr = %f' % (lr))
+    return lr
 
 def train(epoch):
+    global cur_batch
     t0 = time.time()
     train_loader = torch.utils.data.DataLoader(
         dataset.listDataset(trainlist, shape=(model.module.width, model.module.height),
@@ -107,13 +114,15 @@ def train(epoch):
                        ]), train=True, seen=model.module.seen),
         batch_size=batch_size, shuffle=False, **kwargs)
 
-    logging('epoch %d : processed %d samples' % (epoch, epoch * len(train_loader.dataset)))
+    lr = adjust_learning_rate(optimizer, cur_batch)
+    logging('epoch %d : processed %d samples, lr %f' % (epoch, epoch * len(train_loader.dataset), lr))
     model.train()
-    adjust_learning_rate(optimizer, epoch)
     t1 = time.time()
     avg_time = torch.zeros(9)
     for batch_idx, (data, target) in enumerate(train_loader):
         t2 = time.time()
+        adjust_learning_rate(optimizer, cur_batch)
+        cur_batch = cur_batch + 1
         if (batch_idx+1) % dot_interval == 0:
             sys.stdout.write('.')
 
