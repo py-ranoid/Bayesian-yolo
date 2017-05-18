@@ -67,11 +67,12 @@ if use_cuda:
     os.environ['CUDA_VISIBLE_DEVICES'] = gpus
     torch.cuda.manual_seed(seed)
 
-model       = TinyYoloNet() #Darknet(cfgfile)
+model       = Darknet(cfgfile)
 region_loss = model.loss
 
 model.load_weights(weightfile)
 model.print_network()
+region_loss.seen = model.seen
 init_epoch = model.seen / nsamples 
 
 kwargs = {'num_workers': num_workers, 'pin_memory': True} if use_cuda else {}
@@ -126,6 +127,7 @@ def train(epoch):
         t5 = time.time()
         output = model(data)
         t6 = time.time()
+        region_loss.seen = region_loss.seen + data.data.size(0)
         loss = region_loss(output, target)
         t7 = time.time()
         loss.backward()

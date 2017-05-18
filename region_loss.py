@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from utils import *
 
-def build_targets(pred_boxes, target, anchors, num_anchors, nH, nW, noobject_scale, object_scale, sil_thresh):
+def build_targets(pred_boxes, target, anchors, num_anchors, nH, nW, noobject_scale, object_scale, sil_thresh, seen):
     nB = target.size(0)
     nA = num_anchors
     anchor_step = len(anchors)/num_anchors
@@ -34,6 +34,11 @@ def build_targets(pred_boxes, target, anchors, num_anchors, nH, nW, noobject_sca
             cur_gt_boxes = torch.FloatTensor([gx,gy,gw,gh]).repeat(nAnchors,1).t()
             cur_ious = torch.max(cur_ious, bbox_ious(cur_pred_boxes, cur_gt_boxes, x1y1x2y2=False))
         scale_mask[b][cur_ious>sil_thresh] = 0
+        if seen < 12800:
+            tx[b] = 0.5
+            ty[b] = 0.5
+            tw[b] = 0
+            th[b] = 0
 
     nGT = 0
     for b in xrange(nB):
@@ -94,6 +99,7 @@ class RegionLoss(nn.Module):
         self.object_scale = 5
         self.class_scale = 1
         self.thresh = 0.6
+        self.seen = 0
 
     def forward(self, output, target):
         #output : BxAs*(4+1+num_classes)*H*W
@@ -129,7 +135,7 @@ class RegionLoss(nn.Module):
         t2 = time.time()
 
         nGT, mask, scale_mask, tx, ty, tw, th, tconf,tcls = build_targets(pred_boxes, target.data, self.anchors, nA, \
-                                                                   nH, nW, self.noobject_scale, self.object_scale, self.thresh)
+                                                               nH, nW, self.noobject_scale, self.object_scale, self.thresh, self.seen)
         cls_mask = torch.stack([mask.view(-1)]*nC, 1)
 
         tx    = Variable(tx.cuda())
