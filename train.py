@@ -111,7 +111,11 @@ def train(epoch):
                        shuffle=True,
                        transform=transforms.Compose([
                            transforms.ToTensor(),
-                       ]), train=True, seen=model.module.seen),
+                       ]), 
+                       train=True, 
+                       seen=model.module.seen,
+                       batch_size=batch_size,
+                       num_workers=num_workers),
         batch_size=batch_size, shuffle=False, **kwargs)
 
     lr = adjust_learning_rate(optimizer, cur_batch)
