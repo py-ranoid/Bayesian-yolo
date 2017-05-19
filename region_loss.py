@@ -6,12 +6,14 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from utils import *
 
-def build_targets(pred_boxes, target, anchors, num_anchors, nH, nW, noobject_scale, object_scale, sil_thresh, seen):
+def build_targets(pred_boxes, target, anchors, num_anchors, num_classes, nH, nW, noobject_scale, object_scale, sil_thresh, seen):
     nB = target.size(0)
     nA = num_anchors
+    nC = num_classes
     anchor_step = len(anchors)/num_anchors
-    scale_mask = torch.ones(nB, nA, nH, nW) * noobject_scale
-    mask       = torch.zeros(nB, nA, nH, nW)
+    conf_mask  = torch.ones(nB, nA, nH, nW) * noobject_scale
+    coord_mask = torch.zeros(nB, nA, nH, nW)
+    cls_mask   = torch.zeros(nB, nA, nH, nW, nC)
     tx         = torch.zeros(nB, nA, nH, nW) 
     ty         = torch.zeros(nB, nA, nH, nW) 
     tw         = torch.zeros(nB, nA, nH, nW) 
@@ -33,12 +35,13 @@ def build_targets(pred_boxes, target, anchors, num_anchors, nH, nW, noobject_sca
             gh = target[b][t*5+4]*nH
             cur_gt_boxes = torch.FloatTensor([gx,gy,gw,gh]).repeat(nAnchors,1).t()
             cur_ious = torch.max(cur_ious, bbox_ious(cur_pred_boxes, cur_gt_boxes, x1y1x2y2=False))
-        scale_mask[b][cur_ious>sil_thresh] = 0
+        conf_mask[b][cur_ious>sil_thresh] = 0
         if seen < 12800:
             tx[b] = 0.5
             ty[b] = 0.5
             tw[b] = 0
             th[b] = 0
+            coord_mask[b] = 1
 
     nGT = 0
     for b in xrange(nB):
@@ -76,8 +79,9 @@ def build_targets(pred_boxes, target, anchors, num_anchors, nH, nW, noobject_sca
             gt_box = [gx, gy, gw, gh]
             pred_box = pred_boxes[b*nAnchors+best_n*nPixels+gj*nW+gi]
 
-            mask[b][best_n][gj][gi] = 1
-            scale_mask[b][best_n][gj][gi] = object_scale
+            coord_mask[b][best_n][gj][gi] = 1
+            cls_mask[b][best_n][gj][gi] = 1
+            conf_mask[b][best_n][gj][gi] = object_scale
             tx[b][best_n][gj][gi] = target[b][t*5+1] * nW - gi
             ty[b][best_n][gj][gi] = target[b][t*5+2] * nH - gj
             tw[b][best_n][gj][gi] = math.log(gw/anchors[anchor_step*best_n])
@@ -85,7 +89,7 @@ def build_targets(pred_boxes, target, anchors, num_anchors, nH, nW, noobject_sca
             tconf[b][best_n][gj][gi] = bbox_iou(gt_box, pred_box, x1y1x2y2=False) # best_iou
             tcls[b][best_n][gj][gi] = target[b][t*5]
 
-    return nGT, mask, scale_mask, tx, ty, tw, th, tconf, tcls
+    return nGT, coord_mask, conf_mask, cls_mask, tx, ty, tw, th, tconf, tcls
 
 class RegionLoss(nn.Module):
     def __init__(self, num_classes=0, anchors=[], num_anchors=1):
@@ -134,9 +138,9 @@ class RegionLoss(nn.Module):
         pred_boxes = convert2cpu(pred_boxes.transpose(0,1).contiguous().view(-1,4))
         t2 = time.time()
 
-        nGT, mask, scale_mask, tx, ty, tw, th, tconf,tcls = build_targets(pred_boxes, target.data, self.anchors, nA, \
+        nGT, coord_mask, conf_mask, cls_mask, tx, ty, tw, th, tconf,tcls = build_targets(pred_boxes, target.data, self.anchors, nA, nC, \
                                                                nH, nW, self.noobject_scale, self.object_scale, self.thresh, self.seen)
-        cls_mask = torch.stack([mask.view(-1)]*nC, 1)
+        #cls_mask = torch.stack([mask.view(-1)]*nC, 1)
 
         tx    = Variable(tx.cuda())
         ty    = Variable(ty.cuda())
@@ -144,17 +148,17 @@ class RegionLoss(nn.Module):
         th    = Variable(th.cuda())
         tconf = Variable(tconf.cuda())
         tcls  = Variable(tcls.view(-1).long().cuda())
-        mask       = Variable(mask.cuda())
-        scale_mask = Variable(scale_mask.cuda().sqrt())
-        cls_mask   = Variable(cls_mask.cuda())
+        coord_mask = Variable(coord_mask.cuda())
+        conf_mask  = Variable(conf_mask.cuda().sqrt())
+        cls_mask   = Variable(cls_mask.view(-1,nC).cuda())
 
         t3 = time.time()
 
-        loss_x = self.coord_scale * nn.MSELoss(size_average=False)(x*mask, tx*mask)/2.0
-        loss_y = self.coord_scale * nn.MSELoss(size_average=False)(y*mask, ty*mask)/2.0
-        loss_w = self.coord_scale * nn.MSELoss(size_average=False)(w*mask, tw*mask)/2.0
-        loss_h = self.coord_scale * nn.MSELoss(size_average=False)(h*mask, th*mask)/2.0
-        loss_conf = nn.MSELoss(size_average=False)(conf*scale_mask, tconf*scale_mask)/2.0
+        loss_x = self.coord_scale * nn.MSELoss(size_average=False)(x*coord_mask, tx*coord_mask)/2.0
+        loss_y = self.coord_scale * nn.MSELoss(size_average=False)(y*coord_mask, ty*coord_mask)/2.0
+        loss_w = self.coord_scale * nn.MSELoss(size_average=False)(w*coord_mask, tw*coord_mask)/2.0
+        loss_h = self.coord_scale * nn.MSELoss(size_average=False)(h*coord_mask, th*coord_mask)/2.0
+        loss_conf = nn.MSELoss(size_average=False)(conf*conf_mask, tconf*conf_mask)/2.0
         loss_cls = self.class_scale * nn.CrossEntropyLoss(size_average=False)(cls*cls_mask, tcls)
         loss = loss_x + loss_y + loss_w + loss_h + loss_conf + loss_cls
         t4 = time.time()
