@@ -115,7 +115,7 @@ def train(epoch):
         batch_size=batch_size, shuffle=False, **kwargs)
 
     lr = adjust_learning_rate(optimizer, cur_batch)
-    logging('epoch %d : processed %d samples, lr %f' % (epoch, epoch * len(train_loader.dataset), lr))
+    logging('epoch %d, processed %d samples, lr %f' % (epoch, epoch * len(train_loader.dataset), lr))
     model.train()
     t1 = time.time()
     avg_time = torch.zeros(9)
