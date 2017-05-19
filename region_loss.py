@@ -44,6 +44,7 @@ def build_targets(pred_boxes, target, anchors, num_anchors, num_classes, nH, nW,
             coord_mask[b] = 1
 
     nGT = 0
+    nCorrect = 0
     for b in xrange(nB):
         for t in xrange(50):
             if target[b][t*5+1] == 0:
@@ -86,10 +87,13 @@ def build_targets(pred_boxes, target, anchors, num_anchors, num_classes, nH, nW,
             ty[b][best_n][gj][gi] = target[b][t*5+2] * nH - gj
             tw[b][best_n][gj][gi] = math.log(gw/anchors[anchor_step*best_n])
             th[b][best_n][gj][gi] = math.log(gh/anchors[anchor_step*best_n+1])
-            tconf[b][best_n][gj][gi] = bbox_iou(gt_box, pred_box, x1y1x2y2=False) # best_iou
+            iou = bbox_iou(gt_box, pred_box, x1y1x2y2=False) # best_iou
+            tconf[b][best_n][gj][gi] = iou
             tcls[b][best_n][gj][gi] = target[b][t*5]
+            if iou > 0.5:
+                nCorrect = nCorrect + 1
 
-    return nGT, coord_mask, conf_mask, cls_mask, tx, ty, tw, th, tconf, tcls
+    return nGT, nCorrect, coord_mask, conf_mask, cls_mask, tx, ty, tw, th, tconf, tcls
 
 class RegionLoss(nn.Module):
     def __init__(self, num_classes=0, anchors=[], num_anchors=1):
@@ -138,9 +142,10 @@ class RegionLoss(nn.Module):
         pred_boxes = convert2cpu(pred_boxes.transpose(0,1).contiguous().view(-1,4))
         t2 = time.time()
 
-        nGT, coord_mask, conf_mask, cls_mask, tx, ty, tw, th, tconf,tcls = build_targets(pred_boxes, target.data, self.anchors, nA, nC, \
+        nGT, nCorrect, coord_mask, conf_mask, cls_mask, tx, ty, tw, th, tconf,tcls = build_targets(pred_boxes, target.data, self.anchors, nA, nC, \
                                                                nH, nW, self.noobject_scale, self.object_scale, self.thresh, self.seen)
         #cls_mask = torch.stack([mask.view(-1)]*nC, 1)
+        nProposals = int((conf > 0.25).sum().data[0])
 
         tx    = Variable(tx.cuda())
         ty    = Variable(ty.cuda())
@@ -169,4 +174,5 @@ class RegionLoss(nn.Module):
             print('     build targets : %f' % (t3 - t2))
             print('       create loss : %f' % (t4 - t3))
             print('             total : %f' % (t4 - t0))
+        print('%d: nGT %d, recall %d, proposals %d, loss: x %f, y %f, w %f, h %f, conf %f, cls %f, total %f' % (self.seen, nGT, nCorrect, nProposals, loss_x.data[0], loss_y.data[0], loss_w.data[0], loss_h.data[0], loss_conf.data[0], loss_cls.data[0], loss.data[0]))
         return loss

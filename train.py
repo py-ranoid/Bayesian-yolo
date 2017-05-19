@@ -131,8 +131,8 @@ def train(epoch):
         t2 = time.time()
         adjust_learning_rate(optimizer, processed_batches)
         processed_batches = processed_batches + 1
-        if (batch_idx+1) % dot_interval == 0:
-            sys.stdout.write('.')
+        #if (batch_idx+1) % dot_interval == 0:
+        #    sys.stdout.write('.')
 
         if use_cuda:
             data = data.cuda()
