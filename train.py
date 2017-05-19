@@ -37,6 +37,7 @@ testlist      = data_options['valid']
 backupdir     = data_options['backup']
 nsamples      = file_lines(trainlist)
 gpus          = data_options['gpus']  # e.g. 0,1,2,3
+num_workers   = int(data_options['num_workers'])
 
 batch_size    = int(net_options['batch'])
 max_batches   = int(net_options['max_batches'])
@@ -50,7 +51,6 @@ max_epochs    = max_batches*batch_size/nsamples+1
 use_cuda      = True
 seed          = 22222
 eps           = 1e-5
-num_workers   = 10
 save_interval = 10  # epoches
 dot_interval  = 70  # batches
 
@@ -70,13 +70,17 @@ region_loss = model.loss
 
 model.load_weights(weightfile)
 model.print_network()
-region_loss.seen = model.seen
-cur_batch  = model.seen/batch_size
-init_epoch = model.seen/nsamples 
+
+region_loss.seen  = model.seen
+processed_batches = model.seen/batch_size
+
+init_width        = model.width
+init_height       = model.height
+init_epoch        = model.seen/nsamples 
 
 kwargs = {'num_workers': num_workers, 'pin_memory': True} if use_cuda else {}
 test_loader = torch.utils.data.DataLoader(
-    dataset.listDataset(testlist, shape=(model.width, model.height),
+    dataset.listDataset(testlist, shape=(init_width, init_height),
                    shuffle=False,
                    transform=transforms.Compose([
                        transforms.ToTensor(),
@@ -104,10 +108,10 @@ def adjust_learning_rate(optimizer, batch):
     return lr
 
 def train(epoch):
-    global cur_batch
+    global processed_batches
     t0 = time.time()
     train_loader = torch.utils.data.DataLoader(
-        dataset.listDataset(trainlist, shape=(model.module.width, model.module.height),
+        dataset.listDataset(trainlist, shape=(init_width, init_height),
                        shuffle=True,
                        transform=transforms.Compose([
                            transforms.ToTensor(),
@@ -118,15 +122,15 @@ def train(epoch):
                        num_workers=num_workers),
         batch_size=batch_size, shuffle=False, **kwargs)
 
-    lr = adjust_learning_rate(optimizer, cur_batch)
+    lr = adjust_learning_rate(optimizer, processed_batches)
     logging('epoch %d, processed %d samples, lr %f' % (epoch, epoch * len(train_loader.dataset), lr))
     model.train()
     t1 = time.time()
     avg_time = torch.zeros(9)
     for batch_idx, (data, target) in enumerate(train_loader):
         t2 = time.time()
-        adjust_learning_rate(optimizer, cur_batch)
-        cur_batch = cur_batch + 1
+        adjust_learning_rate(optimizer, processed_batches)
+        processed_batches = processed_batches + 1
         if (batch_idx+1) % dot_interval == 0:
             sys.stdout.write('.')
 
@@ -224,7 +228,7 @@ def test(epoch):
 
 evaluate = False
 if evaluate:
-    print('evaluating ...')
+    logging('evaluating ...')
     test(0)
 else:
     for epoch in range(init_epoch, max_epochs): 
