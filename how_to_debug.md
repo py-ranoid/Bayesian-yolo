@@ -133,3 +133,34 @@ for i in xrange(saved_grad.size(0)):
     if abs(saved_grad[i]) >= 0.001:
         print('%d : %f' % (i, saved_grad[i]))
 ```
+### SGD debug
+```
+import torch
+from torch.autograd import Variable
+x = torch.rand(1,1)
+x = Variable(x)
+m = torch.nn.Linear(1,1)
+lr = 0.1 
+momentum = 0.9 
+decay = 0 # 0.0005
+optimizer = torch.optim.SGD(m.parameters(), lr=0.1, momentum=0.9, weight_decay=decay)
+optimizer.zero_grad()
+
+y = m(x)
+
+w = m.weight.data.clone()
+gw = (2*x*y).data.clone()
+print('x = %f, y = %f' % (x.data[0][0], y.data[0][0]))
+print('before: m.weight = %f, m.bias = %f' % (m.weight.data[0][0], m.bias.data[0]))
+loss = y**2
+loss.backward()
+optimizer.step()
+print('after: m.weight = %f, m.bias = %f' % (m.weight.data[0][0], m.bias.data[0]))
+print('m.weight.grad = %f, m.bias.grad = %f' % (m.weight.grad.data[0][0], m.bias.grad.data[0]))
+print('x = %f, y = %f' % (x.data[0][0], y.data[0][0]))
+
+state_w = 0 
+state_w = state_w * momentum + gw + decay*w
+ww = w - lr*state_w
+print('w: grad %f  %f -> %f' % (gw[0][0], w[0][0], ww[0][0]))
+```
