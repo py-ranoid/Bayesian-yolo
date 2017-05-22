@@ -43,6 +43,7 @@ batch_size    = int(net_options['batch'])
 max_batches   = int(net_options['max_batches'])
 learning_rate = float(net_options['learning_rate'])
 momentum      = float(net_options['momentum'])
+decay         = float(net_options['decay'])
 steps         = [float(step) for step in net_options['steps'].split(',')]
 scales        = [float(scale) for scale in net_options['scales'].split(',')]
 
@@ -90,7 +91,7 @@ test_loader = torch.utils.data.DataLoader(
 if use_cuda:
     model = torch.nn.DataParallel(model).cuda()
 
-optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+optimizer = optim.SGD(model.parameters(), lr=learning_rate/batch_size, momentum=momentum, dampening=0, weight_decay=decay)
 
 def adjust_learning_rate(optimizer, batch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""

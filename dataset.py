@@ -79,7 +79,7 @@ class listDataset(Dataset):
         saturation = 1.5 
         exposure = 1.5
 
-        if False:
+        if True:
             img, label = load_data_detection(imgpath, self.shape, jitter, hue, saturation, exposure)
             label = torch.from_numpy(label)
         else:
