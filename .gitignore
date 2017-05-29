@@ -3,4 +3,6 @@
 *.log
 *.jpg
 *.bk
+*.o
+*.so
 backup/
