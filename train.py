@@ -91,7 +91,7 @@ test_loader = torch.utils.data.DataLoader(
 if use_cuda:
     model = torch.nn.DataParallel(model).cuda()
 
-optimizer = optim.SGD(model.parameters(), lr=learning_rate/batch_size, momentum=momentum, dampening=0, weight_decay=decay)
+optimizer = optim.SGD(model.parameters(), lr=learning_rate/batch_size, momentum=momentum, dampening=0, weight_decay=decay*batch_size)
 
 def adjust_learning_rate(optimizer, batch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""

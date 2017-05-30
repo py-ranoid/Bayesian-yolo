@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 from region_loss import RegionLoss
 from cfg import *
+from layers.batchnorm.bn import BN2d
 
 class MaxPoolStride1(nn.Module):
     def __init__(self):
@@ -80,8 +81,8 @@ class Darknet(nn.Module):
         outputs = dict()
         for block in self.blocks:
             ind = ind + 1
-            #if ind > 14:
-            #    return x
+            if ind > 0:
+                return x
 
             if block['type'] == 'net':
                 continue
@@ -149,7 +150,8 @@ class Darknet(nn.Module):
                 model = nn.Sequential()
                 if batch_normalize:
                     model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, pad, bias=False))
-                    model.add_module('bn{0}'.format(conv_id), nn.BatchNorm2d(filters))
+                    #model.add_module('bn{0}'.format(conv_id), nn.BatchNorm2d(filters))
+                    model.add_module('bn{0}'.format(conv_id), BN2d(filters))
                 else:
                     model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, pad))
                 if activation == 'leaky':

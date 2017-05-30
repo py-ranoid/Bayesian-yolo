@@ -27,12 +27,10 @@ class BN2dFunc(Function):
         self.x_norm = input.new(nB, nC, nH, nW) 
         self.mean = input.new(nB, nC) 
         self.var = input.new(nB, nC) 
-        print 'type:', type(self.mean)
 
         if input.is_cuda:
             bn_lib.bn_forward_gpu(input, self.x, self.x_norm, self.mean, self.running_mean, self.var, self.running_var, weight, bias, self.training, output)
         else:
-            print 'using cpu'
             bn_lib.bn_forward(input, self.x, self.x_norm, self.mean, self.running_mean, self.var, self.running_var, weight, bias, self.training, output)
         return output
 
@@ -50,7 +48,6 @@ class BN2dFunc(Function):
         if grad_output.is_cuda:
             bn_lib.bn_backward_gpu(grad_output, self.input, self.x_norm, self.mean, grad_mean, self.var, grad_var, self.weight, grad_weight, self.bias, grad_bias, self.training, grad_input)
         else:
-            print 'using cpu'
             bn_lib.bn_backward(grad_output, self.input, self.x_norm, self.mean, grad_mean, self.var, grad_var, self.weight, grad_weight, self.bias, grad_bias, self.training, grad_input)
         
         return grad_input, grad_weight, grad_bias  
@@ -72,10 +69,12 @@ class BN2d(nn.Module):
         self.bias.data.zero_()
 
     def forward(self, input):
+        print('------------ BN2d input -------------')
+        print(input.data.storage()[0:100])
         return BN2dFunc(self.running_mean, self.running_var, self.training, self.momentum, self.eps)(input, self.weight, self.bias)
 
 if __name__ == '__main__':
-    a = torch.rand(3,3,2,2).cuda()
+    a = torch.rand(4,3,2,2).cuda()
     #a = torch.rand(3,3,2,2)
     a = Variable(a)
     m1 = nn.BatchNorm2d(3)
@@ -89,7 +88,7 @@ if __name__ == '__main__':
     m2.weight.data.fill_(1)
     m2.bias.data.zero_()
     b = m1(a)
-    c = m2(a)
+    c = m2(a)*((16/15.0)**0.5)
     print(b)
     print(c)
 
