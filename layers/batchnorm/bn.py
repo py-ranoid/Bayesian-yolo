@@ -69,26 +69,94 @@ class BN2d(nn.Module):
         self.bias.data.zero_()
 
     def forward(self, input):
-        print('------------ BN2d input -------------')
-        print(input.data.storage()[0:100])
+        #print('------------ BN2d input -------------')
+        #print(input.data.storage()[0:10])
         return BN2dFunc(self.running_mean, self.running_var, self.training, self.momentum, self.eps)(input, self.weight, self.bias)
 
-if __name__ == '__main__':
-    a = torch.rand(4,3,2,2).cuda()
-    #a = torch.rand(3,3,2,2)
-    a = Variable(a)
-    m1 = nn.BatchNorm2d(3)
-    m2 = BN2d(3)
-    m1.cuda()
-    m2.cuda()
-    #m1.eval()
-    #m2.eval()
-    m1.weight.data.fill_(1)
-    m1.bias.data.zero_()
-    m2.weight.data.fill_(1)
-    m2.bias.data.zero_()
-    b = m1(a)
-    c = m2(a)*((16/15.0)**0.5)
-    print(b)
-    print(c)
+class BN2d_slow(nn.Module):
+    def __init__(self, num_features, momentum=0.01):
+        super(BN2d_slow, self).__init__()
+        self.num_features = num_features
+        self.weight = Parameter(torch.Tensor(num_features))
+        self.bias = Parameter(torch.Tensor(num_features))
+        self.register_buffer('running_mean', torch.zeros(num_features))
+        self.register_buffer('running_var', torch.zeros(num_features))
+        self.eps = 1e-5
+        self.momentum = momentum
 
+        self.running_mean.zero_()
+        self.running_var.fill_(1)
+        self.weight.data.uniform_()
+        self.bias.data.zero_()
+    def forward(self, x): 
+        nB = x.data.size(0)
+        nC = x.data.size(1)
+        nH = x.data.size(2)
+        nW = x.data.size(3)
+        samples = nB*nH*nW
+        y = x.view(nB, nC, nH*nW).transpose(1,2).contiguous().view(-1,nC)
+        if self.training:
+            print('forward in training mode on autograd')
+            m = Variable(y.mean(0).data, requires_grad=False)
+            v = Variable(y.var(0).data, requires_grad=False)
+            self.running_mean = (1-self.momentum)*self.running_mean + self.momentum * m.data.view(-1)
+            self.running_var = (1-self.momentum)*self.running_var + self.momentum * v.data.view(-1)
+            m = m.repeat(samples, 1)
+            v = v.repeat(samples, 1)*(samples-1.0)/samples
+        else:
+            m = Variable(self.running_mean.repeat(samples, 1), requires_grad=False)
+            v = Variable(self.running_var.repeat(samples, 1), requires_grad=False)
+        w = self.weight.repeat(samples, 1)
+        b = self.bias.repeat(samples, 1)
+        y = (y - m)/(v+self.eps).sqrt() * w + b 
+        y = y.view(nB, nH*nW, nC).transpose(1,2).contiguous().view(nB, nC, nH, nW) 
+        return y
+
+
+if __name__ == '__main__':
+    nB = 64
+    nC = 3
+    nH = 4
+    nW = 4
+    samples = nB*nH*nW
+    a = torch.rand(nB,nC,nH,nW)
+    a = Variable(a)
+    nn_model  = nn.BatchNorm2d(nC)
+    dkn_model = BN2d(nC)
+    atg_model = BN2d_slow(nC)
+
+    nn_model.weight.data.fill_(1.0)
+    nn_model.bias.data.zero_()
+    dkn_model.weight.data.fill_(1.0)
+    dkn_model.bias.data.zero_()
+    atg_model.weight.data.fill_(1.0)
+    atg_model.bias.data.zero_()
+    nn_out_cpu = nn_model(a)
+    dkn_out_cpu = dkn_model(a)
+    atg_out_cpu = atg_model(a)
+
+
+
+    a = a.cuda()
+    nn_model.cuda()
+    dkn_model.cuda()
+    atg_model.cuda()
+
+    nn_out_gpu = nn_model(a)
+    dkn_out_gpu = dkn_model(a)
+    atg_out_gpu = atg_model(a)
+
+    print('--- nn cpu out ---')
+    print(nn_out_cpu.data.storage()[0:10])
+    print('--- dkn cpu out ---')
+    print(dkn_out_cpu.data.storage()[0:10])
+    print('--- atg cpu out ---')
+    print(atg_out_cpu.data.storage()[0:10])
+
+
+    print('--- nn gpu out ---')
+    print(nn_out_gpu.data.storage()[0:10])
+    print('--- dkn gpu out ---')
+    print(dkn_out_gpu.data.storage()[0:10])
+    print('--- atg gpu out ---')
+    print(atg_out_gpu.data.storage()[0:10])
