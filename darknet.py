@@ -82,8 +82,8 @@ class Darknet(nn.Module):
         outputs = dict()
         for block in self.blocks:
             ind = ind + 1
-            if ind > 0:
-                return x
+            #if ind > 0:
+            #    return x
 
             if block['type'] == 'net':
                 continue
