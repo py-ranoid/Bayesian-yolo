@@ -85,7 +85,7 @@ mAP test on released models
 ```
 yolo-voc.weights 544 0.7682 (paper: 78.6)
 yolo-voc.weights 416 0.7513 (paper: 76.8)
-tiny0-yolo-voc.weights 416 0.5410 (paper: 57.1)
+tiny-yolo-voc.weights 416 0.5410 (paper: 57.1)
 ```
 ---
 #### Problems
