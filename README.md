@@ -81,11 +81,11 @@ python train.py cfg/voc.data cfg/yolo-voc.cfg darknet19_448.conv.23
 python valid.py cfg/voc.data cfg/yolo-voc.cfg yolo-voc.weights
 python scripts/voc_eval.py results/comp4_det_test_
 ```
-mAP 
+mAP test on released models
 ```
-YOLOv2 544 0.7682 (paper: 78.6)
-YOLOv2 416 0.7513 (paper: 76.8)
-TinyYolo 416 0.5410 (paper: 57.1)
+yolo-voc.weights 544 0.7682 (paper: 78.6)
+yolo-voc.weights 416 0.7513 (paper: 76.8)
+tiny0-yolo-voc.weights 416 0.5410 (paper: 57.1)
 ```
 ---
 #### Problems
