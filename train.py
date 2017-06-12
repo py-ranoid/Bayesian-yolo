@@ -91,6 +91,13 @@ test_loader = torch.utils.data.DataLoader(
 if use_cuda:
     model = torch.nn.DataParallel(model).cuda()
 
+params_dict = dict(model.named_parameters())
+params = []
+for key, value in params_dict.items():
+    if key.find('.bn') >= 0 or key.find('.bias') >= 0:
+        params += [{'params': [value], 'weight_decay': 0.0}]
+    else:
+        params += [{'params': [value], 'weight_decay': decay*batch_size}]
 optimizer = optim.SGD(model.parameters(), lr=learning_rate/batch_size, momentum=momentum, dampening=0, weight_decay=decay*batch_size)
 
 def adjust_learning_rate(optimizer, batch):
