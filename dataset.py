@@ -74,10 +74,16 @@ class listDataset(Dataset):
                width = (random.randint(0,16) + 3)*32
                self.shape = (width, width)
 
-        jitter = 0.2
-        hue = 0.1
-        saturation = 1.5 
-        exposure = 1.5
+        if self.train:
+            jitter = 0.2
+            hue = 0.1
+            saturation = 1.5 
+            exposure = 1.5
+        else:
+            jitter = 0.0
+            hue = 0.0
+            saturation = 1.0
+            exposure = 1.0
 
         if True:
             img, label = load_data_detection(imgpath, self.shape, jitter, hue, saturation, exposure)
