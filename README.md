@@ -11,8 +11,7 @@ Convert https://pjreddie.com/darknet/yolo/ into pytorch. This repository is tryi
 - [x] train pascal voc
 - [x] LMDB data set
 - [x] Data augmentation
-- [ ] load/save caffe prototxt and weights
-- [ ] train resnet
+- [x] load/save caffe prototxt and weights
 
 ---
 #### Detection Using A Pre-Trained Model
