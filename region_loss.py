@@ -13,7 +13,7 @@ def build_targets(pred_boxes, target, anchors, num_anchors, num_classes, nH, nW,
     anchor_step = len(anchors)/num_anchors
     conf_mask  = torch.ones(nB, nA, nH, nW) * noobject_scale
     coord_mask = torch.zeros(nB, nA, nH, nW)
-    cls_mask   = torch.zeros(nB, nA, nH, nW, nC)
+    cls_mask   = torch.zeros(nB, nA, nH, nW)
     tx         = torch.zeros(nB, nA, nH, nW) 
     ty         = torch.zeros(nB, nA, nH, nW) 
     tw         = torch.zeros(nB, nA, nH, nW) 
@@ -36,12 +36,16 @@ def build_targets(pred_boxes, target, anchors, num_anchors, num_classes, nH, nW,
             cur_gt_boxes = torch.FloatTensor([gx,gy,gw,gh]).repeat(nAnchors,1).t()
             cur_ious = torch.max(cur_ious, bbox_ious(cur_pred_boxes, cur_gt_boxes, x1y1x2y2=False))
         conf_mask[b][cur_ious>sil_thresh] = 0
-        if False: #seen < 12800:
-            tx[b] = 0.5
-            ty[b] = 0.5
-            tw[b] = 0
-            th[b] = 0
-            coord_mask[b] = 1
+    if seen < 12800:
+       if anchor_step == 4:
+           tx = torch.FloatTensor(anchors).view(nA, anchor_step).index_select(1, torch.LongTensor([2])).view(1,nA,1,1).repeat(nB,1,nH,nW)
+           ty = torch.FloatTensor(anchors).view(num_anchors, anchor_step).index_select(1, torch.LongTensor([2])).view(1,nA,1,1).repeat(nB,1,nH,nW)
+       else:
+           tx.fill_(0.5)
+           ty.fill_(0.5)
+       tw.zero_()
+       th.zero_()
+       coord_mask.fill_(1)
 
     nGT = 0
     nCorrect = 0
@@ -144,7 +148,7 @@ class RegionLoss(nn.Module):
 
         nGT, nCorrect, coord_mask, conf_mask, cls_mask, tx, ty, tw, th, tconf,tcls = build_targets(pred_boxes, target.data, self.anchors, nA, nC, \
                                                                nH, nW, self.noobject_scale, self.object_scale, self.thresh, self.seen)
-        #cls_mask = torch.stack([mask.view(-1)]*nC, 1)
+        cls_mask = (cls_mask == 1)
         nProposals = int((conf > 0.25).sum().data[0])
 
         tx    = Variable(tx.cuda())
@@ -152,10 +156,12 @@ class RegionLoss(nn.Module):
         tw    = Variable(tw.cuda())
         th    = Variable(th.cuda())
         tconf = Variable(tconf.cuda())
-        tcls  = Variable(tcls.view(-1).long().cuda())
+        tcls  = Variable(tcls.view(-1)[cls_mask].long().cuda())
+
         coord_mask = Variable(coord_mask.cuda())
         conf_mask  = Variable(conf_mask.cuda().sqrt())
-        cls_mask   = Variable(cls_mask.view(-1,nC).cuda())
+        cls_mask   = Variable(cls_mask.view(-1, 1).repeat(1,nC).cuda())
+        cls        = cls[cls_mask].view(-1, nC)  
 
         t3 = time.time()
 
@@ -164,7 +170,7 @@ class RegionLoss(nn.Module):
         loss_w = self.coord_scale * nn.MSELoss(size_average=False)(w*coord_mask, tw*coord_mask)/2.0
         loss_h = self.coord_scale * nn.MSELoss(size_average=False)(h*coord_mask, th*coord_mask)/2.0
         loss_conf = nn.MSELoss(size_average=False)(conf*conf_mask, tconf*conf_mask)/2.0
-        loss_cls = self.class_scale * nn.CrossEntropyLoss(size_average=False)(cls*cls_mask, tcls)
+        loss_cls = self.class_scale * nn.CrossEntropyLoss(size_average=False)(cls, tcls)
         loss = loss_x + loss_y + loss_w + loss_h + loss_conf + loss_cls
         t4 = time.time()
         if False:

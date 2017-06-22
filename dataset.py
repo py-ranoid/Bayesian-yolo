@@ -57,23 +57,19 @@ class listDataset(Dataset):
         if self.train and index % bs == 0:
             if self.seen < 4000*bs*nw:
                width = 13*32
-               self.shape = (width, width)
             elif self.seen < 8000*bs*nw:
                width = (random.randint(0,2)*2 + 13)*32
-               self.shape = (width, width)
             elif self.seen < 12000*bs*nw:
                width = (random.randint(0,4)*2 + 9)*32
-               self.shape = (width, width)
             elif self.seen < 16000*bs*nw:
                width = (random.randint(0,6)*2 + 5)*32
-               self.shape = (width, width)
             elif self.seen < 20000*bs*nw:
                width = (random.randint(0,12) + 5)*32
-               self.shape = (width, width)
             else: # self.seen < 24000*bs*nw:
                width = (random.randint(0,16) + 3)*32
-               self.shape = (width, width)
 
+        width = 416
+        self.shape = (width, width)
         if self.train:
             jitter = 0.2
             hue = 0.1
