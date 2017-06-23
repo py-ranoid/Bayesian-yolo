@@ -5,6 +5,7 @@ if len(sys.argv) != 4:
     print('python train.py datacfg cfgfile weightfile')
     exit()
 
+import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -20,6 +21,7 @@ from utils import *
 from cfg import parse_cfg
 from region_loss import RegionLoss
 from darknet import Darknet
+from models.tiny_yolo import TinyYoloNet
 
 
 # Training settings
@@ -34,23 +36,23 @@ trainlist     = data_options['train']
 testlist      = data_options['valid']
 backupdir     = data_options['backup']
 nsamples      = file_lines(trainlist)
+gpus          = data_options['gpus']  # e.g. 0,1,2,3
+num_workers   = int(data_options['num_workers'])
 
 batch_size    = int(net_options['batch'])
 max_batches   = int(net_options['max_batches'])
 learning_rate = float(net_options['learning_rate'])
 momentum      = float(net_options['momentum'])
-
+decay         = float(net_options['decay'])
+steps         = [float(step) for step in net_options['steps'].split(',')]
+scales        = [float(scale) for scale in net_options['scales'].split(',')]
 
 #Train parameters
 max_epochs    = max_batches*batch_size/nsamples+1
 use_cuda      = True
-seed          = 22222
+seed          = int(time.time())
 eps           = 1e-5
-
-epoch_step    = 120 # epochs to change lr
-lr_step       = 0.1
-num_workers   = 8
-save_interval = 15  # epoches
+save_interval = 10  # epoches
 dot_interval  = 70  # batches
 
 # Test parameters
@@ -61,6 +63,7 @@ iou_thresh    = 0.5
 ###############
 torch.manual_seed(seed)
 if use_cuda:
+    os.environ['CUDA_VISIBLE_DEVICES'] = gpus
     torch.cuda.manual_seed(seed)
 
 model       = Darknet(cfgfile)
@@ -68,11 +71,17 @@ region_loss = model.loss
 
 model.load_weights(weightfile)
 model.print_network()
-init_epoch = model.seen / nsamples 
+
+region_loss.seen  = model.seen
+processed_batches = model.seen/batch_size
+
+init_width        = model.width
+init_height       = model.height
+init_epoch        = model.seen/nsamples 
 
 kwargs = {'num_workers': num_workers, 'pin_memory': True} if use_cuda else {}
 test_loader = torch.utils.data.DataLoader(
-    dataset.listDataset(testlist, shape=(model.width, model.height),
+    dataset.listDataset(testlist, shape=(init_width, init_height),
                    shuffle=False,
                    transform=transforms.Compose([
                        transforms.ToTensor(),
@@ -82,42 +91,98 @@ test_loader = torch.utils.data.DataLoader(
 if use_cuda:
     model = torch.nn.DataParallel(model).cuda()
 
-optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+params_dict = dict(model.named_parameters())
+params = []
+for key, value in params_dict.items():
+    if key.find('.bn') >= 0 or key.find('.bias') >= 0:
+        params += [{'params': [value], 'weight_decay': 0.0}]
+    else:
+        params += [{'params': [value], 'weight_decay': decay*batch_size}]
+optimizer = optim.SGD(model.parameters(), lr=learning_rate/batch_size, momentum=momentum, dampening=0, weight_decay=decay*batch_size)
 
-def adjust_learning_rate(optimizer, epoch):
+def adjust_learning_rate(optimizer, batch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (lr_step ** (epoch // epoch_step))
+    lr = learning_rate
+    for i in range(len(steps)):
+        scale = scales[i] if i < len(scales) else 1
+        if batch >= steps[i]:
+            lr = lr * scale
+            if batch == steps[i]:
+                break
+        else:
+            break
     for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-    if epoch % epoch_step == 0:
-        logging('lr = %f' % (lr))
+        param_group['lr'] = lr/batch_size
+    return lr
 
 def train(epoch):
+    global processed_batches
+    t0 = time.time()
     train_loader = torch.utils.data.DataLoader(
-        dataset.listDataset(trainlist, shape=(model.module.width, model.module.height),
+        dataset.listDataset(trainlist, shape=(init_width, init_height),
                        shuffle=True,
                        transform=transforms.Compose([
                            transforms.ToTensor(),
-                       ]), train=True, seen=model.module.seen),
+                       ]), 
+                       train=True, 
+                       seen=model.module.seen,
+                       batch_size=batch_size,
+                       num_workers=num_workers),
         batch_size=batch_size, shuffle=False, **kwargs)
 
-    logging('epoch %d : processed %d samples' % (epoch, epoch * len(train_loader.dataset)))
+    lr = adjust_learning_rate(optimizer, processed_batches)
+    logging('epoch %d, processed %d samples, lr %f' % (epoch, epoch * len(train_loader.dataset), lr))
     model.train()
-    adjust_learning_rate(optimizer, epoch)
+    t1 = time.time()
+    avg_time = torch.zeros(9)
     for batch_idx, (data, target) in enumerate(train_loader):
-        if (batch_idx+1) % dot_interval == 0:
-            sys.stdout.write('.')
+        t2 = time.time()
+        adjust_learning_rate(optimizer, processed_batches)
+        processed_batches = processed_batches + 1
+        #if (batch_idx+1) % dot_interval == 0:
+        #    sys.stdout.write('.')
 
         if use_cuda:
             data = data.cuda()
             #target= target.cuda()
+        t3 = time.time()
         data, target = Variable(data), Variable(target)
+        t4 = time.time()
         optimizer.zero_grad()
+        t5 = time.time()
         output = model(data)
+        t6 = time.time()
+        region_loss.seen = region_loss.seen + data.data.size(0)
         loss = region_loss(output, target)
+        t7 = time.time()
         loss.backward()
+        t8 = time.time()
         optimizer.step()
+        t9 = time.time()
+        if False and batch_idx > 1:
+            avg_time[0] = avg_time[0] + (t2-t1)
+            avg_time[1] = avg_time[1] + (t3-t2)
+            avg_time[2] = avg_time[2] + (t4-t3)
+            avg_time[3] = avg_time[3] + (t5-t4)
+            avg_time[4] = avg_time[4] + (t6-t5)
+            avg_time[5] = avg_time[5] + (t7-t6)
+            avg_time[6] = avg_time[6] + (t8-t7)
+            avg_time[7] = avg_time[7] + (t9-t8)
+            avg_time[8] = avg_time[8] + (t9-t1)
+            print('-------------------------------')
+            print('       load data : %f' % (avg_time[0]/(batch_idx)))
+            print('     cpu to cuda : %f' % (avg_time[1]/(batch_idx)))
+            print('cuda to variable : %f' % (avg_time[2]/(batch_idx)))
+            print('       zero_grad : %f' % (avg_time[3]/(batch_idx)))
+            print(' forward feature : %f' % (avg_time[4]/(batch_idx)))
+            print('    forward loss : %f' % (avg_time[5]/(batch_idx)))
+            print('        backward : %f' % (avg_time[6]/(batch_idx)))
+            print('            step : %f' % (avg_time[7]/(batch_idx)))
+            print('           total : %f' % (avg_time[8]/(batch_idx)))
+        t1 = time.time()
     print('')
+    t1 = time.time()
+    logging('training with %f samples/s' % (len(train_loader.dataset)/(t1-t0)))
     if (epoch+1) % save_interval == 0:
         logging('save weights to %s/%06d.weights' % (backupdir, epoch+1))
         model.module.seen = (epoch + 1) * len(train_loader.dataset)
@@ -171,7 +236,7 @@ def test(epoch):
 
 evaluate = False
 if evaluate:
-    print('evaluating ...')
+    logging('evaluating ...')
     test(0)
 else:
     for epoch in range(init_epoch, max_epochs): 

@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 from region_loss import RegionLoss
 from cfg import *
+#from layers.batchnorm.bn import BN2d
 
 class MaxPoolStride1(nn.Module):
     def __init__(self):
@@ -47,7 +48,15 @@ class GlobalAvgPool2d(nn.Module):
         x = x.view(N, C)
         return x
 
-# support route and reorg
+# for route and shortcut
+class EmptyModule(nn.Module):
+    def __init__(self):
+        super(EmptyModule, self).__init__()
+
+    def forward(self, x):
+        return x
+
+# support route shortcut and reorg
 class Darknet(nn.Module):
     def __init__(self, cfgfile):
         super(Darknet, self).__init__()
@@ -58,10 +67,11 @@ class Darknet(nn.Module):
         self.width = int(self.blocks[0]['width'])
         self.height = int(self.blocks[0]['height'])
 
-        self.anchors = self.loss.anchors
-        self.num_anchors = self.loss.num_anchors
-        self.anchor_step = self.loss.anchor_step
-        self.num_classes = self.loss.num_classes
+        if self.blocks[(len(self.blocks)-1)]['type'] == 'region':
+            self.anchors = self.loss.anchors
+            self.num_anchors = self.loss.num_anchors
+            self.anchor_step = self.loss.anchor_step
+            self.num_classes = self.loss.num_classes
 
         self.header = torch.IntTensor([0,0,0,0])
         self.seen = 0
@@ -72,12 +82,12 @@ class Darknet(nn.Module):
         outputs = dict()
         for block in self.blocks:
             ind = ind + 1
-            #if ind > 14:
+            #if ind > 0:
             #    return x
 
             if block['type'] == 'net':
                 continue
-            elif block['type'] == 'convolutional' or block['type'] == 'maxpool' or block['type'] == 'reorg' or block['type'] == 'avgpool' or block['type'] == 'softmax':
+            elif block['type'] == 'convolutional' or block['type'] == 'maxpool' or block['type'] == 'reorg' or block['type'] == 'avgpool' or block['type'] == 'softmax' or block['type'] == 'connected':
                 x = self.models[ind](x)
                 outputs[ind] = x
             elif block['type'] == 'route':
@@ -91,6 +101,18 @@ class Darknet(nn.Module):
                     x2 = outputs[layers[1]]
                     x = torch.cat((x1,x2),1)
                     outputs[ind] = x
+            elif block['type'] == 'shortcut':
+                from_layer = int(block['from'])
+                activation = block['activation']
+                from_layer = from_layer if from_layer > 0 else from_layer + ind
+                x1 = outputs[from_layer]
+                x2 = outputs[ind-1]
+                x  = x1 + x2
+                if activation == 'leaky':
+                    x = F.leaky_relu(x, 0.1, inplace=True)
+                elif activation == 'relu':
+                    x = F.relu(x, inplace=True)
+                outputs[ind] = x
             elif block['type'] == 'region':
                 continue
                 if self.loss:
@@ -130,10 +152,13 @@ class Darknet(nn.Module):
                 if batch_normalize:
                     model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, pad, bias=False))
                     model.add_module('bn{0}'.format(conv_id), nn.BatchNorm2d(filters))
+                    #model.add_module('bn{0}'.format(conv_id), BN2d(filters))
                 else:
                     model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, pad))
                 if activation == 'leaky':
                     model.add_module('leaky{0}'.format(conv_id), nn.LeakyReLU(0.1, inplace=True))
+                elif activation == 'relu':
+                    model.add_module('relu{0}'.format(conv_id), nn.ReLU(inplace=True))
                 prev_filters = filters
                 out_filters.append(prev_filters)
                 models.append(model)
@@ -178,7 +203,27 @@ class Darknet(nn.Module):
                     assert(layers[0] == ind - 1)
                     prev_filters = out_filters[layers[0]] + out_filters[layers[1]]
                 out_filters.append(prev_filters)
-                models.append(nn.ReLU())
+                models.append(EmptyModule())
+            elif block['type'] == 'shortcut':
+                ind = len(models)
+                prev_filters = out_filters[ind-1]
+                out_filters.append(prev_filters)
+                models.append(EmptyModule())
+            elif block['type'] == 'connected':
+                filters = int(block['output'])
+                if block['activation'] == 'linear':
+                    model = nn.Linear(prev_filters, filters)
+                elif block['activation'] == 'leaky':
+                    model = nn.Sequential(
+                               nn.Linear(prev_filters, filters),
+                               nn.LeakyReLU(0.1, inplace=True))
+                elif block['activation'] == 'relu':
+                    model = nn.Sequential(
+                               nn.Linear(prev_filters, filters),
+                               nn.ReLU(inplace=True))
+                prev_filters = filters
+                out_filters.append(prev_filters)
+                models.append(model)
             elif block['type'] == 'region':
                 loss = RegionLoss()
                 anchors = block['anchors'].split(',')
@@ -220,11 +265,19 @@ class Darknet(nn.Module):
                     start = load_conv_bn(buf, start, model[0], model[1])
                 else:
                     start = load_conv(buf, start, model[0])
+            elif block['type'] == 'connected':
+                model = self.models[ind]
+                if block['activation'] != 'linear':
+                    start = load_fc(buf, start, model[0])
+                else:
+                    start = load_fc(buf, start, model)
             elif block['type'] == 'maxpool':
                 pass
             elif block['type'] == 'reorg':
                 pass
             elif block['type'] == 'route':
+                pass
+            elif block['type'] == 'shortcut':
                 pass
             elif block['type'] == 'region':
                 pass
@@ -257,11 +310,19 @@ class Darknet(nn.Module):
                     save_conv_bn(fp, model[0], model[1])
                 else:
                     save_conv(fp, model[0])
+            elif block['type'] == 'connected':
+                model = self.models[ind]
+                if block['activation'] != 'linear':
+                    save_fc(fc, model)
+                else:
+                    save_fc(fc, model[0])
             elif block['type'] == 'maxpool':
                 pass
             elif block['type'] == 'reorg':
                 pass
             elif block['type'] == 'route':
+                pass
+            elif block['type'] == 'shortcut':
                 pass
             elif block['type'] == 'region':
                 pass

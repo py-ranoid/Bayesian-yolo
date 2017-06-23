@@ -10,9 +10,8 @@ Convert https://pjreddie.com/darknet/yolo/ into pytorch. This repository is tryi
 - [x] pascal voc validation
 - [x] train pascal voc
 - [x] LMDB data set
-- [ ] Data augmentation
-- [ ] train resnet
-- [ ] load/save caffe prototxt and weights
+- [x] Data augmentation
+- [x] load/save caffe prototxt and weights
 
 ---
 #### Detection Using A Pre-Trained Model
@@ -83,9 +82,10 @@ python scripts/voc_eval.py results/comp4_det_test_
 ```
 mAP test on released models
 ```
-yolo-voc.weights 544 0.7682 (darknet: 78.6)
-yolo-voc.weights 416 0.7513 (darknet: 76.8)
-tiny-yolo-voc.weights 416 0.5410 (darknet: 57.1)
+yolo-voc.weights 544 0.7682 (paper: 78.6)
+yolo-voc.weights 416 0.7513 (paper: 76.8)
+tiny-yolo-voc.weights 416 0.5410 (paper: 57.1)
+
 ```
 ---
 #### Problems
