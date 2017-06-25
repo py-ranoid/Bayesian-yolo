@@ -12,6 +12,7 @@ Convert https://pjreddie.com/darknet/yolo/ into pytorch. This repository is tryi
 - [x] LMDB data set
 - [x] Data augmentation
 - [x] load/save caffe prototxt and weights
+- [x] **reproduce darknet's training results**
 
 ---
 #### Detection Using A Pre-Trained Model
