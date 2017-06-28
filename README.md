@@ -13,6 +13,7 @@ Convert https://pjreddie.com/darknet/yolo/ into pytorch. This repository is tryi
 - [x] Data augmentation
 - [x] load/save caffe prototxt and weights
 - [x] **reproduce darknet's training results**
+- [x] [convert weight/cfg between caffe and darknet](https://github.com/marvis/pytorch-caffe-darknet-convert)
 
 ---
 #### Detection Using A Pre-Trained Model
