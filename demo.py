@@ -1,5 +1,3 @@
-from PIL import Image, ImageDraw
-from models.tiny_yolo import TinyYoloNet
 from utils import *
 from darknet import Darknet
 import cv2
