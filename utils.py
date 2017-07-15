@@ -192,7 +192,7 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors, num_anchors, onl
         print('---------------------------------')
     return all_boxes
 
-def plot_boxes(img, boxes, savename, class_names=None):
+def plot_boxes(img, boxes, savename=None, class_names=None):
     colors = torch.FloatTensor([[1,0,1],[0,0,1],[0,1,1],[0,1,0],[1,1,0],[1,0,0]]);
     def get_color(c, x, max_val):
         ratio = float(x)/max_val * 5
@@ -225,7 +225,10 @@ def plot_boxes(img, boxes, savename, class_names=None):
             rgb = (red, green, blue)
             draw.text((x1, y1), class_names[cls_id], fill=rgb)
         draw.rectangle([x1, y1, x2, y2], outline = rgb)
-    img.save(savename)
+    if savename:
+        print("save plot results to %s" % savename)
+        img.save(savename)
+    return img
 
 def read_truths(lab_path):
     if os.path.getsize(lab_path):
@@ -273,6 +276,14 @@ def do_detect(model, img, conf_thresh, nms_thresh, use_cuda=1):
         img = img.view(height, width, 3).transpose(0,1).transpose(0,2).contiguous()
         img = img.view(1, 3, height, width)
         img = img.float().div(255.0)
+    elif type(img) == np.ndarray: # cv2 image
+        import cv2
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = torch.from_numpy(img.transpose(2,0,1)).float().div(255.0).unsqueeze(0)
+    else:
+        print("unknow image type")
+        exit(-1)
+
     t1 = time.time()
 
     if use_cuda:

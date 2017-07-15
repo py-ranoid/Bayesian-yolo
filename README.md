@@ -37,7 +37,9 @@ dog: 0.990524
 ```
 ---
 #### Real-Time Detection on a Webcam
-
+```
+python demo.py cfg/tiny-yolo-voc.cfg tiny-yolo-voc.weights
+```
 ---
 
 #### Training YOLO on VOC
