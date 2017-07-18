@@ -192,7 +192,7 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors, num_anchors, onl
         print('---------------------------------')
     return all_boxes
 
-def plot_boxes_cv2(img, boxes, savename=None, class_names=None):
+def plot_boxes_cv2(img, boxes, savename=None, class_names=None, color=None):
     import cv2
     colors = torch.FloatTensor([[1,0,1],[0,0,1],[0,1,1],[0,1,0],[1,1,0],[1,0,0]]);
     def get_color(c, x, max_val):
@@ -212,7 +212,10 @@ def plot_boxes_cv2(img, boxes, savename=None, class_names=None):
         x2 = int(round((box[0] + box[2]/2.0) * width))
         y2 = int(round((box[1] + box[3]/2.0) * height))
 
-        rgb = (255, 0, 0)
+        if color:
+            rgb = color
+        else:
+            rgb = (255, 0, 0)
         if len(box) >= 7 and class_names:
             cls_conf = box[5]
             cls_id = box[6]
@@ -222,7 +225,8 @@ def plot_boxes_cv2(img, boxes, savename=None, class_names=None):
             red   = get_color(2, offset, classes)
             green = get_color(1, offset, classes)
             blue  = get_color(0, offset, classes)
-            rgb = (red, green, blue)
+            if color is None:
+                rgb = (red, green, blue)
             img = cv2.putText(img, class_names[cls_id], (x1,y1), cv2.FONT_HERSHEY_SIMPLEX, 1.2, rgb, 1)
         img = cv2.rectangle(img, (x1,y1), (x2,y2), rgb, 1)
     if savename:
@@ -316,8 +320,6 @@ def do_detect(model, img, conf_thresh, nms_thresh, use_cuda=1):
         img = img.view(1, 3, height, width)
         img = img.float().div(255.0)
     elif type(img) == np.ndarray: # cv2 image
-        import cv2
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = torch.from_numpy(img.transpose(2,0,1)).float().div(255.0).unsqueeze(0)
     else:
         print("unknow image type")
@@ -373,6 +375,16 @@ def read_data_cfg(datacfg):
         options[key] = value
     return options
 
+def scale_bboxes(bboxes, width, height):
+    import copy
+    dets = copy.deepcopy(bboxes)
+    for i in range(len(dets)):
+        dets[i][0] = dets[i][0] * width
+        dets[i][1] = dets[i][1] * height
+        dets[i][2] = dets[i][2] * width
+        dets[i][3] = dets[i][3] * height
+    return dets
+      
 def file_lines(thefilepath):
     count = 0
     thefile = open(thefilepath, 'rb')
