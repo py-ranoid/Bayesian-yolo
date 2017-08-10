@@ -37,6 +37,7 @@ testlist      = data_options['valid']
 backupdir     = data_options['backup']
 nsamples      = file_lines(trainlist)
 gpus          = data_options['gpus']  # e.g. 0,1,2,3
+ngpus         = len(gpus.split(','))
 num_workers   = int(data_options['num_workers'])
 
 batch_size    = int(net_options['batch'])
@@ -89,7 +90,10 @@ test_loader = torch.utils.data.DataLoader(
     batch_size=batch_size, shuffle=False, **kwargs)
 
 if use_cuda:
-    model = torch.nn.DataParallel(model).cuda()
+    if ngpus > 1:
+        model = torch.nn.DataParallel(model).cuda()
+    else:
+        model = model.cuda()
 
 params_dict = dict(model.named_parameters())
 params = []
@@ -118,6 +122,10 @@ def adjust_learning_rate(optimizer, batch):
 def train(epoch):
     global processed_batches
     t0 = time.time()
+    if ngpus > 1:
+        cur_model = model.module
+    else:
+        cur_model = model
     train_loader = torch.utils.data.DataLoader(
         dataset.listDataset(trainlist, shape=(init_width, init_height),
                        shuffle=True,
@@ -125,7 +133,7 @@ def train(epoch):
                            transforms.ToTensor(),
                        ]), 
                        train=True, 
-                       seen=model.module.seen,
+                       seen=cur_model.seen,
                        batch_size=batch_size,
                        num_workers=num_workers),
         batch_size=batch_size, shuffle=False, **kwargs)
@@ -185,8 +193,8 @@ def train(epoch):
     logging('training with %f samples/s' % (len(train_loader.dataset)/(t1-t0)))
     if (epoch+1) % save_interval == 0:
         logging('save weights to %s/%06d.weights' % (backupdir, epoch+1))
-        model.module.seen = (epoch + 1) * len(train_loader.dataset)
-        model.module.save_weights('%s/%06d.weights' % (backupdir, epoch+1))
+        cur_model.seen = (epoch + 1) * len(train_loader.dataset)
+        cur_model.save_weights('%s/%06d.weights' % (backupdir, epoch+1))
 
 def test(epoch):
     def truths_length(truths):
@@ -195,9 +203,13 @@ def test(epoch):
                 return i
 
     model.eval()
-    num_classes = model.module.num_classes
-    anchors     = model.module.anchors
-    num_anchors = model.module.num_anchors
+    if ngpus > 1:
+        cur_model = model.module
+    else:
+        cur_model = model
+    num_classes = cur_model.num_classes
+    anchors     = cur_model.anchors
+    num_anchors = cur_model.num_anchors
     total       = 0.0
     proposals   = 0.0
     correct     = 0.0
