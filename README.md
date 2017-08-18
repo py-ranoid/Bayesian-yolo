@@ -98,13 +98,13 @@ A implementation of paper [Focal Loss for Dense Object Detection](https://arxiv.
 
 We get the results by using Focal Loss to replace CrossEntropyLoss in RegionLosss.
 
-`$\alpha$`| `$\gamma$` | training set | val set | mAP@416 | mAP@544 | Notes
----       |---         |---           |---      |---      |---      |---
-[1,...,1] | 0          |VOC2007+2012  | VOC2007 |++73.05++|++74.69++| std-Cross Entropy Loss
-[1,...,1] | 1          |VOC2007+2012  | VOC2007 | 73.63   |75.26    | Focal Loss
-[1,...,1] | 2          |VOC2007+2012  | VOC2007 |==74.08==|==75.49==| Focal Loss
-[1,...,1] | 3          |VOC2007+2012  | VOC2007 |73.73    |75.20    | Focal Loss
-[1,...,1] | 4          |VOC2007+2012  | VOC2007 |   73.53 |   74.95 | Focal Loss
+ gama       | training set | val set | mAP@416 | mAP@544 | Notes
+---         |---           |---      |---      |---      |---
+ 0          |VOC2007+2012  | VOC2007 | 73.05   |  74.69  | std-Cross Entropy Loss
+ 1          |VOC2007+2012  | VOC2007 | 73.63   |  75.26  | Focal Loss
+ 2          |VOC2007+2012  | VOC2007 | *74.08* | *75.49* | Focal Loss
+ 3          |VOC2007+2012  | VOC2007 |  73.73  |  75.20  | Focal Loss
+ 4          |VOC2007+2012  | VOC2007 |  73.53  |  74.95  | Focal Loss
 
 
 ---
