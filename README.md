@@ -14,6 +14,7 @@ Convert https://pjreddie.com/darknet/yolo/ into pytorch. This repository is tryi
 - [x] load/save caffe prototxt and weights
 - [x] **reproduce darknet's training results**
 - [x] [convert weight/cfg between pytorch caffe and darknet](https://github.com/marvis/pytorch-caffe-darknet-convert)
+- [x] add focal loss
 
 ---
 #### Detection Using A Pre-Trained Model
