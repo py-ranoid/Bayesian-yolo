@@ -102,7 +102,7 @@ We get the results by using Focal Loss to replace CrossEntropyLoss in RegionLoss
 ---         |---           |---      |---      |---      |---
  0          |VOC2007+2012  | VOC2007 | 73.05   |  74.69  | std-Cross Entropy Loss
  1          |VOC2007+2012  | VOC2007 | 73.63   |  75.26  | Focal Loss
- 2          |VOC2007+2012  | VOC2007 | *74.08* | *75.49* | Focal Loss
+ 2          |VOC2007+2012  | VOC2007 |**74.08**|**75.49**| Focal Loss
  3          |VOC2007+2012  | VOC2007 |  73.73  |  75.20  | Focal Loss
  4          |VOC2007+2012  | VOC2007 |  73.53  |  74.95  | Focal Loss
 
