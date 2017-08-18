@@ -67,17 +67,20 @@ class listDataset(Dataset):
     
             labpath = imgpath.replace('images', 'labels').replace('JPEGImages', 'labels').replace('.jpg', '.txt').replace('.png','.txt')
             label = torch.zeros(50*5)
-            if os.path.getsize(labpath):
-                #tmp = torch.from_numpy(np.loadtxt(labpath))
-                tmp = torch.from_numpy(read_truths_args(labpath, 8.0/img.width))
-                #tmp = torch.from_numpy(read_truths(labpath))
-                tmp = tmp.view(-1)
-                tsz = tmp.numel()
-                #print('labpath = %s , tsz = %d' % (labpath, tsz))
-                if tsz > 50*5:
-                    label = tmp[0:50*5]
-                elif tsz > 0:
-                    label[0:tsz] = tmp
+            #if os.path.getsize(labpath):
+            #tmp = torch.from_numpy(np.loadtxt(labpath))
+            try:
+                tmp = torch.from_numpy(read_truths_args(labpath, 8.0/img.width).astype('float32'))
+            except Exception:
+                tmp = torch.zeros(1,5)
+            #tmp = torch.from_numpy(read_truths(labpath))
+            tmp = tmp.view(-1)
+            tsz = tmp.numel()
+            #print('labpath = %s , tsz = %d' % (labpath, tsz))
+            if tsz > 50*5:
+                label = tmp[0:50*5]
+            elif tsz > 0:
+                label[0:tsz] = tmp
 
         if self.transform is not None:
             img = self.transform(img)

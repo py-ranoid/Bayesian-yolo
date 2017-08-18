@@ -273,6 +273,8 @@ def plot_boxes(img, boxes, savename=None, class_names=None):
     return img
 
 def read_truths(lab_path):
+    if not os.path.exists(lab_path):
+        return np.array([])
     if os.path.getsize(lab_path):
         truths = np.loadtxt(lab_path)
         truths = truths.reshape(truths.size/5, 5) # to avoid single truth problem
