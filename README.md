@@ -119,3 +119,6 @@ x[index] = (x[index] - mean[f])/(sqrt(variance[f] + .00001f));
 ---
 #### License
 MIT License (see LICENSE file).
+
+#### Contribution
+Thanks for the contributions from @iceflame89 for the image augmentation and @huaijin-chen for focal loss.
