@@ -115,3 +115,7 @@ Change the code in normalize_cpu to make the same result
 normalize_cpu:
 x[index] = (x[index] - mean[f])/(sqrt(variance[f] + .00001f));
 ``` 
+
+---
+#### License
+MIT License (see LICENSE file).
