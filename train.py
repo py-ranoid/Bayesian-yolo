@@ -17,6 +17,7 @@ from torch.autograd import Variable
 import dataset
 import random
 import math
+import os
 from utils import *
 from cfg import parse_cfg
 from region_loss import RegionLoss
@@ -61,6 +62,9 @@ conf_thresh   = 0.25
 nms_thresh    = 0.4
 iou_thresh    = 0.5
 
+if not os.path.exists(backupdir):
+    os.mkdir(backupdir)
+    
 ###############
 torch.manual_seed(seed)
 if use_cuda:
