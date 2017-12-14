@@ -117,7 +117,7 @@ x[index] = (x[index] - mean[f])/(sqrt(variance[f] + .00001f));
 ``` 
 #### Training on your own data
 1. Padding your images into square size and produce the corresponding label files.
-2. Modify the resize strageties in listDataset.
+2. Modify the resize strageties in listDataset. Currently the resize scales range from 320 ~ 608, and the resize intervals is 64, which should be equal to batch_size or several times of batch_size. 
 3. Add warm up learning rate (scales=**0.1**,10,.1,.1)
 4. Train your model as VOC does.
 
