@@ -36,7 +36,7 @@ def createDataset(outputPath, imageListFile, checkValid=True):
     env = lmdb.open(outputPath, map_size=1099511627776)
     cache = {}
     cnt = 1
-    for i in xrange(nSamples):
+    for i in range(nSamples):
         imagePath = imagePathList[i].rstrip()
         labelPath = imagePath.replace('images', 'labels').replace('JPEGImages', 'labels').replace('.jpg', '.txt').replace('.png','.txt')
         with open(labelPath) as f:

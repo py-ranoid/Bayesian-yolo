@@ -74,7 +74,7 @@ output.register_hook(extract)
 loss.backward()
 
 saved_grad = saved_grad.view(-1)
-for i in xrange(saved_grad.size(0)):
+for i in range(saved_grad.size(0)):
     if abs(saved_grad[i]) >= 0.001:
         print('%d : %f' % (i, saved_grad[i]))
 
