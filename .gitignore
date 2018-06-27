@@ -5,6 +5,8 @@
 *.bk
 *.o
 *.so
+*.weights
 VOCdevkit/*
 20*
 VOC*
+*.23
