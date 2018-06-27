@@ -16,7 +16,7 @@ def valid(datacfg, cfgfile, weightfile, outfile):
     with open(valid_images) as fp:
         tmp_files = fp.readlines()
         valid_files = [item.rstrip() for item in tmp_files]
-    
+
     m = Darknet(cfgfile)
     m.print_network()
     m.load_weights(weightfile)
@@ -27,13 +27,14 @@ def valid(datacfg, cfgfile, weightfile, outfile):
                        shuffle=False,
                        transform=transforms.Compose([
                            transforms.ToTensor(),
+                           lambda x: 2 * (x - 0.5)
                        ]))
     valid_batchsize = 2
     assert(valid_batchsize > 1)
 
     kwargs = {'num_workers': 4, 'pin_memory': True}
     valid_loader = torch.utils.data.DataLoader(
-        valid_dataset, batch_size=valid_batchsize, shuffle=False, **kwargs) 
+        valid_dataset, batch_size=valid_batchsize, shuffle=False, **kwargs)
 
     fps = [0]*m.num_classes
     if not os.path.exists('results'):
@@ -41,9 +42,9 @@ def valid(datacfg, cfgfile, weightfile, outfile):
     for i in range(m.num_classes):
         buf = '%s/%s%s.txt' % (prefix, outfile, names[i])
         fps[i] = open(buf, 'w')
-   
+
     lineId = -1
-    
+
     conf_thresh = 0.005
     nms_thresh = 0.45
     for batch_idx, (data, target) in enumerate(valid_loader):

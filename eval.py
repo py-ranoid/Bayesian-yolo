@@ -60,6 +60,7 @@ test_loader = torch.utils.data.DataLoader(
                    shuffle=False,
                    transform=transforms.Compose([
                        transforms.ToTensor(),
+                       lambda x: 2 * (x - 0.5)
                    ]), train=False),
     batch_size=batch_size, shuffle=False, **kwargs)
 
@@ -91,9 +92,9 @@ def test():
             boxes = nms(boxes, nms_thresh)
             truths = target[i].view(-1, 5)
             num_gts = truths_length(truths)
-     
+
             total = total + num_gts
-    
+
             for i in range(len(boxes)):
                 if boxes[i][4] > conf_thresh:
                     proposals = proposals+1

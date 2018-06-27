@@ -91,6 +91,7 @@ test_loader = torch.utils.data.DataLoader(
                         shuffle=False,
                         transform=transforms.Compose([
                             transforms.ToTensor(),
+                            lambda x: 2 * (x - 0.5)
                         ]), train=False),
     batch_size=batch_size, shuffle=False, **kwargs)
 
@@ -139,6 +140,7 @@ def train(epoch):
                             shuffle=True,
                             transform=transforms.Compose([
                                 transforms.ToTensor(),
+                                lambda x: 2 * (x - 0.5)
                             ]),
                             train=True,
                             seen=cur_model.seen,
