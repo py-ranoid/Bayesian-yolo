@@ -5,7 +5,7 @@ import numpy as np
 from region_loss import RegionLoss
 from cfg import *
 import BayesianLayers
-from compression import compute_compression_rate, compute_reduced_weights
+# from compression import compute_compression_rate, compute_reduced_weights
 
 #from layers.batchnorm.bn import BN2d
 
@@ -81,46 +81,109 @@ class Darknet(nn.Module):
         self.header = torch.IntTensor([0,0,0,0])
         self.seen = 0
 
-
-    def get_masks(self,thresholds,layers):
+    def get_masks(self, thresholds):
         weight_masks = []
+        bias_masks = []
         conv_mask = None
         lin_mask = None
         for i, (layer, threshold) in enumerate(zip(self.kl_list, thresholds)):
             # compute dropout mask
             if layer.get_type() == 'conv':
                 if conv_mask is None:
-                    mask = [True]*layer.in_channels
+                    mask = [True] * layer.in_channels
                 else:
                     mask = np.copy(conv_mask)
 
-                log_alpha = layers[i].get_log_dropout_rates().cpu().data.numpy()
+                # print ("CONV:", np.array(mask).shape)
+                log_alpha = layers[i].get_log_dropout_rates(
+                ).cpu().data.numpy()
                 conv_mask = log_alpha < thresholds[i]
+                # print ("CONV-MASK:", conv_mask.shape)
+                # print (layer.bias_mu.shape)
 
-                print(np.sum(mask),np.sum(conv_mask))
+                # print(np.sum(mask), np.sum(conv_mask))
 
-                weight_mask = np.expand_dims(mask, axis=0) * np.expand_dims(conv_mask, axis=1)
-                weight_mask = weight_mask[:,:,None,None]
+                weight_mask = np.expand_dims(
+                    mask, axis=0) * np.expand_dims(conv_mask, axis=1)
+                weight_mask = weight_mask[:, :, None, None]
+                bias_mask = conv_mask
             else:
                 if lin_mask is None:
-                    mask = conv_mask.repeat(layer.in_features/conv_mask.shape[0])
+                    mask = conv_mask.repeat(
+                        layer.in_features / conv_mask.shape[0])
                 else:
                     mask = np.copy(lin_mask)
-
+                # print ("LIN:", mask.shape)
                 try:
-                    log_alpha = layers[i + 1].get_log_dropout_rates().cpu().data.numpy()
+                    log_alpha = layers[i +
+                                       1].get_log_dropout_rates().cpu().data.numpy()
                     lin_mask = log_alpha < thresholds[i + 1]
                 except:
                     # must be the last mask
                     lin_mask = np.ones(10)
+                # print ("LIN-MASK:", lin_mask.shape)
+                # print (layer.bias_mu.shape)
+                # print(np.sum(mask), np.sum(lin_mask))
 
-                print(np.sum(mask),np.sum(lin_mask))
-
-                weight_mask = np.expand_dims(mask, axis=0) * np.expand_dims(lin_mask, axis=1)
+                weight_mask = np.expand_dims(
+                    mask, axis=0) * np.expand_dims(lin_mask, axis=1)
+                bias_mask = lin_mask
 
             weight_masks.append(weight_mask.astype(np.float))
+            bias_masks.append(bias_mask.astype(np.float))
+        return weight_masks, bias_masks
 
-        return weight_masks
+        # def get_masks(self, thresholds):
+        #     weight_masks = []
+        #     bias_masks = []
+        #     conv_mask = None
+        #     lin_mask = None
+        #     for i, (layer, threshold) in enumerate(zip(self.kl_list, thresholds)):
+        #         # compute dropout mask
+        #         if layer.get_type() == 'conv':
+        #             if conv_mask is None:
+        #                 mask = [True] * layer.in_channels
+        #             else:
+        #                 mask = np.copy(conv_mask)
+        #
+        #             # print ("CONV:", np.array(mask).shape)
+        #             log_alpha = layers[i].get_log_dropout_rates(
+        #             ).cpu().data.numpy()
+        #             conv_mask = log_alpha < thresholds[i]
+        #             # print ("CONV-MASK:", conv_mask.shape)
+        #             # print (layer.bias_mu.shape)
+        #
+        #             # print(np.sum(mask), np.sum(conv_mask))
+        #
+        #             weight_mask = np.expand_dims(
+        #                 mask, axis=0) * np.expand_dims(conv_mask, axis=1)
+        #             weight_mask = weight_mask[:, :, None, None]
+        #             bias_mask = conv_mask
+        #         else:
+        #             if lin_mask is None:
+        #                 mask = conv_mask.repeat(
+        #                     layer.in_features / conv_mask.shape[0])
+        #             else:
+        #                 mask = np.copy(lin_mask)
+        #             # print ("LIN:", mask.shape)
+        #             try:
+        #                 log_alpha = layers[i +
+        #                                    1].get_log_dropout_rates().cpu().data.numpy()
+        #                 lin_mask = log_alpha < thresholds[i + 1]
+        #             except:
+        #                 # must be the last mask
+        #                 lin_mask = np.ones(10)
+        #             # print ("LIN-MASK:", lin_mask.shape)
+        #             # print (layer.bias_mu.shape)
+        #             # print(np.sum(mask), np.sum(lin_mask))
+        #
+        #             weight_mask = np.expand_dims(
+        #                 mask, axis=0) * np.expand_dims(lin_mask, axis=1)
+        #             bias_mask = lin_mask
+        #
+        #         weight_masks.append(weight_mask.astype(np.float))
+        #         bias_masks.append(bias_mask.astype(np.float))
+        #     return weight_masks, bias_masks
 
     def kl_divergence(self):
         KLD = 0
@@ -128,7 +191,7 @@ class Darknet(nn.Module):
             KLD += layer.kl_divergence()
         return KLD
 
-            
+
     def forward(self, x):
         ind = -2
         self.loss = None
@@ -185,7 +248,7 @@ class Darknet(nn.Module):
     def create_network(self, blocks):
         models = nn.ModuleList()
         # print (models)
-    
+
         prev_filters = 3
         out_filters =[]
         conv_id = 0
@@ -300,7 +363,7 @@ class Darknet(nn.Module):
                 models.append(loss)
             else:
                 print('unknown type %s' % (block['type']))
-    
+
 
         return models
 
@@ -330,29 +393,29 @@ class Darknet(nn.Module):
                     # start = load_conv_bn(buf, start, model[0], model[1])
                     num_w = conv_model.weight_mu.numel()
                     num_b = bn_model.bias.numel()
-                    # bn_model.bias.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.bias.shape[0],bn_model.bias.shape[1], bn_model.bias.shape[2],bn_model.bias.shape[3])))    
+                    # bn_model.bias.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.bias.shape[0],bn_model.bias.shape[1], bn_model.bias.shape[2],bn_model.bias.shape[3])))
                     # start = start + num_b
-                    # bn_model.weight.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.weight.shape[0],bn_model.weight.shape[1], bn_model.weight.shape[2],bn_model.weight.shape[3]))) 
+                    # bn_model.weight.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.weight.shape[0],bn_model.weight.shape[1], bn_model.weight.shape[2],bn_model.weight.shape[3])))
                     # start = start + num_b
                     # bn_model.running_mean.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.running_mean.shape[0],bn_model.running_mean.shape[1], bn_model.running_mean.shape[2],bn_model.running_mean.shape[3])));
                     # start = start + num_b
-                    # bn_model.running_var.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.running_var.shape[0],bn_model.running_var.shape[1], bn_model.running_var.shape[2],bn_model.running_var.shape[3])));  
+                    # bn_model.running_var.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.running_var.shape[0],bn_model.running_var.shape[1], bn_model.running_var.shape[2],bn_model.running_var.shape[3])));
                     # start = start + num_b
                     bn_model.bias.data.copy_(torch.from_numpy(buf[start:start+num_b]));     start = start + num_b
                     bn_model.weight.data.copy_(torch.from_numpy(buf[start:start+num_b]));   start = start + num_b
                     bn_model.running_mean.copy_(torch.from_numpy(buf[start:start+num_b]));  start = start + num_b
                     bn_model.running_var.copy_(torch.from_numpy(buf[start:start+num_b]));   start = start + num_b
 
-                    conv_model.weight_mu.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(conv_model.weight_mu.shape[0],conv_model.weight_mu.shape[1], conv_model.weight_mu.shape[2],conv_model.weight_mu.shape[3])));  
-                    start = start + num_w 
+                    conv_model.weight_mu.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(conv_model.weight_mu.shape[0],conv_model.weight_mu.shape[1], conv_model.weight_mu.shape[2],conv_model.weight_mu.shape[3])));
+                    start = start + num_w
 
                 else:
                     conv_model = model[0]
                     num_w = conv_model.weight_mu.numel()
                     num_b = conv_model.bias_mu.numel()
-                    conv_model.bias_mu.data.copy_(torch.from_numpy(buf[start:start+num_b])); 
+                    conv_model.bias_mu.data.copy_(torch.from_numpy(buf[start:start+num_b]));
                     start = start + num_b
-                    conv_model.weight_mu.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(conv_model.weight_mu.shape[0],conv_model.weight_mu.shape[1], conv_model.weight_mu.shape[2],conv_model.weight_mu.shape[3]))); 
+                    conv_model.weight_mu.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(conv_model.weight_mu.shape[0],conv_model.weight_mu.shape[1], conv_model.weight_mu.shape[2],conv_model.weight_mu.shape[3])));
                     start = start + num_w
                 #     start = load_conv(buf, start, model[0])
             elif block['type'] == 'connected':
