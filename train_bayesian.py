@@ -17,6 +17,7 @@ import numpy as np
 from utils import *
 from cfg import parse_cfg
 # from darknet import Darknet
+from matplotlib import pyplot as plt
 from darknet_bayesian import Darknet
 from compression2 import compute_compression_rate, compute_reduced_weights
 
@@ -297,24 +298,48 @@ else:
         train(epoch)
         test(epoch)
 
-    torch.save(model.state_dict(), "darknet_bayes.pkl")
+    pickle_fname = BASE_PATH + "vals/ep_"+str(max_epochs)+"_darknet_bayes.pkl"
+    torch.save(model.state_dict(), pickle_fname)
     print ("model")
 
     layers = [model.models[0].conv1, model.models[2].conv2,model.models[4].conv3,model.models[6].conv4,model.models[8].conv5,model.models[10].conv6,model.models[12].conv7,model.models[13].conv8,model.models[14].conv9]
     thresholds = [-3,-3,-3,-3,-3,-3,-3,-3,-3]
+    log_alphas = [l.get_log_dropout_rates() for l in layers]
+
+    thresh_path = BASE_PATH+'thresh_plots'
+    if os.path.exists(thresh_path):
+        os.mkdir(thresh_path)
+    for lar in log_alphas:
+        plt.hist(lar.cpu().data.numpy(), bins=80)
+        plt.xlabel('Threshold')
+        plt.ylabel('# Groups')
+        plt.savefig(thresh_path+'/lenet_%d_epochs_layer%d' %
+                    (FLAGS.epochs, lr))
+        # plt.show()
+        plt.close()
+        lr += 1
+
+
+
+
     compute_compression_rate(layers, model.get_masks(thresholds))
 
     print("Test error after with reduced bit precision:")
 
     weights,biases = compute_reduced_weights(layers, model.get_masks(thresholds))
     all_files = []
+
+    vals_path = BASE_PATH+'vals'
+    if not os.path.exists(vals_path):
+        os.mkdir(vals_path)
+
     for i, (layer, weight, bias) in enumerate(zip(layers, weights, biases)):
         new_weight = weight.astype(np.float16).reshape(-1)
         new_bias = bias.astype(np.float16).reshape(-1)
 
         fname = 'lr' + str(i) + '_ep' + str(max_epochs) + '_'
-        wt_fname = BASE_PATH + 'vals/' + fname + 'wt.txt'
-        bs_fname = BASE_PATH + 'vals/' + fname + 'bs.txt'
+        wt_fname = vals_path + '/' + fname + 'wt.txt'
+        bs_fname = vals_path + '/' + fname + 'bs.txt'
         all_files.append(wt_fname)
         all_files.append(bs_fname)
 
@@ -323,7 +348,7 @@ else:
 
         layer.post_weight_mu = torch.Tensor(weight).cuda()
         layer.post_bias_mu = (torch.Tensor(bias).cuda())
-    header_gen(all_files,BASE_PATH+'vals/header_ep' + str(max_epochs)+'.h')
+    header_gen(all_files,vals_path+'/header_ep' + str(max_epochs)+'.h')
 
     for layer in layers: layer.deterministic = True
 
