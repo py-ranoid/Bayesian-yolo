@@ -17,7 +17,8 @@ from utils import *
 from cfg import parse_cfg
 # from darknet import Darknet
 from darknet_bayesian import Darknet
-from compression import compute_compression_rate, compute_reduced_weights
+from compression2 import compute_compression_rate, compute_reduced_weights
+# from compression import compute_compression_rate, compute_reduced_weights
 
 # Training settings
 datacfg       = sys.argv[1]
@@ -308,4 +309,4 @@ else:
         else:
             layer.post_weight_mu.data = torch.Tensor(weight)
     for layer in layers: layer.deterministic = True
-    test(epoch)
+    test(0)

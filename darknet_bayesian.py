@@ -4,7 +4,8 @@ import torch.nn.functional as F
 import numpy as np
 from region_loss import RegionLoss
 from cfg import *
-import BayesianLayers
+import BayesianLayers2 as BayesianLayers
+# import BayesianLayers
 # from compression import compute_compression_rate, compute_reduced_weights
 
 #from layers.batchnorm.bn import BN2d
