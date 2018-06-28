@@ -1,3 +1,8 @@
+[Find tiny-yolo's weights for VOC here](https://drive.google.com/drive/folders/1KUr2u8yb24bluPdKbt3DT7ezoF9ObXSB?usp=sharing)
+
+---
+## Original README
+---
 ### pytorch-yolo2
 Convert https://pjreddie.com/darknet/yolo/ into pytorch. This repository is trying to achieve the following goals.
 - [x] implement RegionLoss, MaxPoolStride1, Reorg, GolbalAvgPool2d
