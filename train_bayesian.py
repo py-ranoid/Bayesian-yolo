@@ -13,17 +13,21 @@ from torch.autograd import Variable
 
 import dataset
 import os
+import numpy as np
 from utils import *
 from cfg import parse_cfg
 # from darknet import Darknet
 from darknet_bayesian import Darknet
 from compression2 import compute_compression_rate, compute_reduced_weights
+
+BASE_PATH = '/gandiva-store/user1/pytorch-yolo2/' if os.environ.get('GANDIVA_USER') else './'
 # from compression import compute_compression_rate, compute_reduced_weights
 
 # Training settings
 datacfg       = sys.argv[1]
 cfgfile       = sys.argv[2]
 weightfile    = sys.argv[3]
+
 
 data_options  = read_data_cfg(datacfg)
 net_options   = parse_cfg(cfgfile)[0]
@@ -58,7 +62,6 @@ conf_thresh   = 0.25
 nms_thresh    = 0.4
 iou_thresh    = 0.5
 
-print (max_epochs)
 if not os.path.exists(backupdir):
     os.mkdir(backupdir)
 
@@ -288,6 +291,7 @@ if evaluate:
     logging('evaluating ...')
     test(0)
 else:
+    print ("MAX EPOCHS :",max_epochs)
     for epoch in range(init_epoch, max_epochs):
     # for epoch in range(0, 5):
         train(epoch)
@@ -298,15 +302,29 @@ else:
 
     layers = [model.models[0].conv1, model.models[2].conv2,model.models[4].conv3,model.models[6].conv4,model.models[8].conv5,model.models[10].conv6,model.models[12].conv7,model.models[13].conv8,model.models[14].conv9]
     thresholds = [-3,-3,-3,-3,-3,-3,-3,-3,-3]
-    compute_compression_rate(layers, model.get_masks(thresholds,layers))
+    compute_compression_rate(layers, model.get_masks(thresholds))
 
     print("Test error after with reduced bit precision:")
 
-    weights = compute_reduced_weights(layers, model.get_masks(thresholds,layers))
-    for layer, weight in zip(layers, weights):
-        if True:
-            layer.post_weight_mu.data = torch.Tensor(weight).cuda()
-        else:
-            layer.post_weight_mu.data = torch.Tensor(weight)
+    weights,biases = compute_reduced_weights(layers, model.get_masks(thresholds))
+    all_files = []
+    for i, (layer, weight, bias) in enumerate(zip(layers, weights, biases)):
+        new_weight = weight.astype(np.float16).reshape(-1)
+        new_bias = bias.astype(np.float16).reshape(-1)
+
+        fname = 'lr' + str(i) + '_ep' + str(max_epochs) + '_'
+        wt_fname = BASE_PATH + 'vals/' + fname + 'wt.txt'
+        bs_fname = BASE_PATH + 'vals/' + fname + 'bs.txt'
+        all_files.append(wt_fname)
+        all_files.append(bs_fname)
+
+        np.savetxt(wt_fname, new_weight)
+        np.savetxt(bs_fname, new_bias)
+
+        layer.post_weight_mu = torch.Tensor(weight).cuda()
+        layer.post_bias_mu = (torch.Tensor(bias).cuda())
+    header_gen(all_files,BASE_PATH+'vals/header_ep' + str(max_epochs)+'.h')
+
     for layer in layers: layer.deterministic = True
+
     test(0)

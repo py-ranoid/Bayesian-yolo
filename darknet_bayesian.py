@@ -83,6 +83,7 @@ class Darknet(nn.Module):
         self.seen = 0
 
     def get_masks(self, thresholds):
+        layers = self.kl_list
         weight_masks = []
         bias_masks = []
         conv_mask = None
