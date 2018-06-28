@@ -365,6 +365,8 @@ class Conv2dGroupNJ(_ConvNdGroupNJ):
             in_channels, out_channels, kernel_size, stride, padding, dilation,
             False, utils._pair(0), groups, bias, init_weight, init_bias, cuda, clip_var)
 
+        # print (dir(self))
+
     def forward(self, x):
         if self.deterministic:
             assert self.training == False, "Flag deterministic is True. This should not be used in training."
@@ -392,8 +394,8 @@ class Conv2dGroupNJ(_ConvNdGroupNJ):
 
     def __repr__(self):
         return self.__class__.__name__ + ' (' \
-            + str(self.in_features) + ' -> ' \
-            + str(self.out_features) + ')'
+            + str(self.in_channels) + ' -> ' \
+            + str(self.out_channels) + ')'
 
 
 class Conv3dGroupNJ(_ConvNdGroupNJ):
