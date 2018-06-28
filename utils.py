@@ -4,7 +4,7 @@ import time
 import math
 import torch
 import numpy as np
-from sklearn import preprocessing
+# from sklearn import preprocessing
 from PIL import Image, ImageDraw, ImageFont
 from torch.autograd import Variable
 import struct  # get_image_size
@@ -492,13 +492,14 @@ def header_gen(files, fname_save):
             contents = f.read().strip()
         nums = [str(np.float32(i)) for i in contents.split('\n')]
         num_total += len(nums)
-        le = preprocessing.LabelEncoder()
-        le.fit(nums)
+        # le = preprocessing.LabelEncoder()
+        # le.fit(nums)
         header = '#include "ap_int.h"\n#include "ap_fixed.h'
 
-        indices = [str(i) for i in le.transform(nums)]
+        lookup = list(set(nums))
+        indices = [lookup.index(i) for i in nums]
 
-        lookup = [str(i) for i in le.classes_]
+
         num_lookup = (len(lookup))
         print (num_lookup, lookup)
         num_bits = int(np.ceil(np.log2(num_lookup)))

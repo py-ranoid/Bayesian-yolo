@@ -307,17 +307,16 @@ else:
     log_alphas = [l.get_log_dropout_rates() for l in layers]
 
     thresh_path = BASE_PATH+'thresh_plots'
-    if os.path.exists(thresh_path):
+    if not os.path.exists(thresh_path):
         os.mkdir(thresh_path)
-    for lar in log_alphas:
+    for lr,lar in enumerate(log_alphas):
         plt.hist(lar.cpu().data.numpy(), bins=80)
         plt.xlabel('Threshold')
         plt.ylabel('# Groups')
         plt.savefig(thresh_path+'/lenet_%d_epochs_layer%d' %
-                    (FLAGS.epochs, lr))
+                    (max_epochs, lr))
         # plt.show()
         plt.close()
-        lr += 1
 
 
 
