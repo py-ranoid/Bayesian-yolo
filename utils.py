@@ -4,11 +4,13 @@ import time
 import math
 import torch
 import numpy as np
+from sklearn import preprocessing
 from PIL import Image, ImageDraw, ImageFont
 from torch.autograd import Variable
-
 import struct  # get_image_size
 import imghdr  # get_image_size
+import glob
+import re
 
 
 def sigmoid(x):
@@ -476,3 +478,51 @@ def get_image_size(fname):
 
 def logging(message):
     print('%s %s' % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), message))
+
+
+def header_gen(files, fname_save):
+    header = '#include "ap_int.h"\n#include "ap_fixed.h"'.strip()
+    decs = ''
+    types = []
+    num_total = 0
+    for fname in files:
+        print (fname)
+        layer = re.findall('.*lr([0-9])*_.*(wt|bs)', fname)[0]
+        with open(fname, 'r') as f:
+            contents = f.read().strip()
+        nums = [str(np.float32(i)) for i in contents.split('\n')]
+        num_total += len(nums)
+        le = preprocessing.LabelEncoder()
+        le.fit(nums)
+        header = '#include "ap_int.h"\n#include "ap_fixed.h'
+
+        indices = [str(i) for i in le.transform(nums)]
+
+        lookup = [str(i) for i in le.classes_]
+        num_lookup = (len(lookup))
+        print (num_lookup, lookup)
+        num_bits = int(np.ceil(np.log2(num_lookup)))
+        vals_type = 'bit' + str(num_bits) + '_t'
+        types.append((num_bits, vals_type))
+        table_name = 'lookup_w_' + \
+            layer[0] if layer[1] == 'wt' else 'lookup_b_' + layer[0]
+        vals_name = 'vals_w_' + \
+            layer[0] if layer[1] == 'wt' else 'vals_b_' + layer[0]
+
+        table = '{' + ','.join(lookup) + '}'
+        array = '{' + ','.join(indices) + '}'
+
+        declaration = 'const float32_t ' + table_name + \
+            '[' + str(num_lookup) + ']' + ' = ' + table + ';'
+        declaration += '\nconst ' + vals_type + ' ' + vals_name + \
+            '[' + str(len(indices)) + ']' + ' = ' + array + ';'
+
+        decs += '\n\n' + declaration
+    for num, vtype in set(types):
+        td = '\ntypedef ap_uint<' + str(num) + '> ' + vtype + ';'
+        header += td
+    header += decs
+    print (num_total)
+    print (fname_save)
+    with open(fname_save, 'w') as f:
+        f.write(header)
