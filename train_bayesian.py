@@ -7,24 +7,16 @@ if len(sys.argv) != 4:
 
 import time
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
-import torch.backends.cudnn as cudnn
-from torchvision import datasets, transforms
+from torchvision import transforms
 from torch.autograd import Variable
 
 import dataset
-import random
-import math
 import os
 from utils import *
 from cfg import parse_cfg
-from region_loss import RegionLoss
 # from darknet import Darknet
 from darknet_bayesian import Darknet
-from models.tiny_yolo import TinyYoloNet
-import BayesianLayers
 from compression import compute_compression_rate, compute_reduced_weights
 
 # Training settings
@@ -53,7 +45,7 @@ steps         = [float(step) for step in net_options['steps'].split(',')]
 scales        = [float(scale) for scale in net_options['scales'].split(',')]
 
 #Train parameters
-max_epochs    = max_batches*batch_size/nsamples+1
+max_epochs    = int(max_batches*batch_size/nsamples)+1
 use_cuda      = True
 seed          = int(time.time())
 eps           = 1e-5
@@ -68,7 +60,7 @@ iou_thresh    = 0.5
 print (max_epochs)
 if not os.path.exists(backupdir):
     os.mkdir(backupdir)
-    
+
 ###############
 torch.manual_seed(seed)
 if use_cuda:
@@ -86,7 +78,7 @@ processed_batches = model.seen/batch_size
 
 init_width        = model.width
 init_height       = model.height
-init_epoch        = model.seen/nsamples 
+init_epoch        = model.seen/nsamples
 
 kwargs = {'num_workers': num_workers, 'pin_memory': True} if use_cuda else {}
 test_loader = torch.utils.data.DataLoader(
@@ -113,7 +105,7 @@ for key, value in params_dict.items():
         params += [{'params': [value], 'weight_decay': 0.0}]
     else:
         params += [{'params': [value], 'weight_decay': decay*batch_size}]
-        
+
 optimizer = optim.SGD(model.parameters(), lr=learning_rate/batch_size, momentum=momentum, dampening=0, weight_decay=decay*batch_size)
 # optimizer = optim.Adam(model.parameters(), lr=learning_rate/batch_size,weight_decay=decay*batch_size)
 
@@ -163,8 +155,8 @@ def train(epoch):
                        transform=transforms.Compose([
                            transforms.ToTensor(),
                            lambda x: 2 * (x - 0.5)
-                       ]), 
-                       train=True, 
+                       ]),
+                       train=True,
                        seen=cur_model.seen,
                        batch_size=batch_size,
                        num_workers=num_workers),
@@ -206,7 +198,7 @@ def train(epoch):
 
         for layer in model.kl_list:
                 layer.clip_variances()
-                
+
         if False and batch_idx > 1:
             avg_time[0] = avg_time[0] + (t2-t1)
             avg_time[1] = avg_time[1] + (t3-t2)
@@ -235,7 +227,7 @@ def train(epoch):
     #     logging('save weights to %s/%06d.weights' % (backupdir, epoch+1))
     #     cur_model.seen = (epoch + 1) * len(train_loader.dataset)
     #     cur_model.save_weights('%s/%06d.weights' % (backupdir, epoch+1))
-    
+
 
 def test(epoch):
     def truths_length(truths):
@@ -266,9 +258,9 @@ def test(epoch):
             boxes = nms(boxes, nms_thresh)
             truths = target[i].view(-1, 5)
             num_gts = truths_length(truths)
-     
+
             total = total + num_gts
-    
+
             for i in range(len(boxes)):
                 if boxes[i][4] > conf_thresh:
                     proposals = proposals+1
@@ -295,8 +287,8 @@ if evaluate:
     logging('evaluating ...')
     test(0)
 else:
-    for epoch in range(init_epoch, max_epochs): 
-    # for epoch in range(0, 5): 
+    for epoch in range(init_epoch, max_epochs):
+    # for epoch in range(0, 5):
         train(epoch)
         test(epoch)
 
@@ -306,7 +298,6 @@ else:
     layers = [model.models[0].conv1, model.models[2].conv2,model.models[4].conv3,model.models[6].conv4,model.models[8].conv5,model.models[10].conv6,model.models[12].conv7,model.models[13].conv8,model.models[14].conv9]
     thresholds = [-3,-3,-3,-3,-3,-3,-3,-3,-3]
     compute_compression_rate(layers, model.get_masks(thresholds,layers))
-
 
     print("Test error after with reduced bit precision:")
 
@@ -318,6 +309,3 @@ else:
             layer.post_weight_mu.data = torch.Tensor(weight)
     for layer in layers: layer.deterministic = True
     test(epoch)
-
-
-
