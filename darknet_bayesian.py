@@ -5,6 +5,10 @@ import numpy as np
 from region_loss import RegionLoss
 from cfg import *
 import BayesianLayers2 as BayesianLayers
+from datetime import datetime
+from os import mkdir
+from glob import glob
+
 # import BayesianLayers
 # from compression import compute_compression_rate, compute_reduced_weights
 
@@ -444,6 +448,52 @@ class Darknet(nn.Module):
                 pass
             else:
                 print('unknown type %s' % (block['type']))
+
+    def load_weights_txt (self,folder_path):
+        weight_files = glob(folder_path+'/*wt.txt')
+        weight_files.sort()
+
+        bias_files = glob(folder_path+'/*bs.txt')
+        bias_files.sort()
+
+        for l,wt_file,bs_file in zip(self.kl_list,weight_files,bias_files):
+            wt_loaded = np.loadtxt(wt_file)
+            bs_loaded = np.loadtxt(bs_file)
+            new_wt = torch.from_numpy(wt_loaded).view(l.weight_mu.shape).float()
+            new_bs = torch.from_numpy(bs_loaded).view(l.bias_mu.shape).float()
+            l.post_weight_mu = new_wt.cuda()
+            l.post_bias_mu = new_bs.cuda()
+            l.deterministic = True
+
+    def save_weights_txt (self,epochs,vals_path,after=True):
+        all_files = []
+        now = datetime.now()'PRE'
+        status = 'POST' if after else
+        folder = ['weights',status,'ep'+str(epochs), str(now.hour),str(now.minute)]
+        folder_name = '_'.join(folder)
+
+        vals_path += '/'+folder_name
+        mkdir(vals_path)
+
+        for i,l in enumerate(self.kl_list):
+            weight = l.post_weight_mu.cpu().data.numpy()
+            bias = l.post_bias_mu.cpu().data.numpy()
+
+            new_weight = weight.astype(np.float16).reshape(-1)
+            new_bias = bias.astype(np.float16).reshape(-1)
+
+            fname = 'lr' + str(i) + '_ep' + str(epochs) + '_'
+
+            wt_fname = vals_path + '/' + fname + 'wt.txt'
+            bs_fname = vals_path + '/' + fname + 'bs.txt'
+
+            np.savetxt(wt_fname, new_weight)
+            np.savetxt(bs_fname, new_bias)
+
+            all_files.append(wt_fname)
+            all_files.append(bs_fname)
+        return all_files,vals_path
+
 
     def save_weights(self, outfile, cutoff=0):
         if cutoff <= 0:

@@ -332,22 +332,14 @@ else:
     if not os.path.exists(vals_path):
         os.mkdir(vals_path)
 
-    for i, (layer, weight, bias) in enumerate(zip(layers, weights, biases)):
-        new_weight = weight.astype(np.float16).reshape(-1)
-        new_bias = bias.astype(np.float16).reshape(-1)
-
-        fname = 'lr' + str(i) + '_ep' + str(max_epochs) + '_'
-        wt_fname = vals_path + '/' + fname + 'wt.txt'
-        bs_fname = vals_path + '/' + fname + 'bs.txt'
-        all_files.append(wt_fname)
-        all_files.append(bs_fname)
-
-        np.savetxt(wt_fname, new_weight)
-        np.savetxt(bs_fname, new_bias)
-
+    for i, (layer, weight, bias, block_i) in enumerate(zip(layers, weights, biases,model.conv_blocks_indices)):
         layer.post_weight_mu = torch.Tensor(weight).cuda()
         layer.post_bias_mu = (torch.Tensor(bias).cuda())
-    header_gen(all_files,vals_path+'/header_ep' + str(max_epochs)+'.h')
+        model.blocks[block_i]['filters'] = int(layer.post_bias_mu.shape[0])
+
+    paths,vals_path = model.save_weights_txt(max_epochs,vals_path,after=True)
+    save_cfg(model.blocks,vals_path+'/output.cfg')
+    header_gen(paths,vals_path +'/header_ep' + str(max_epochs)+'.h')
 
     for layer in layers: layer.deterministic = True
 
