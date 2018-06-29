@@ -321,11 +321,12 @@ else:
 
 
 
-    compute_compression_rate(layers, model.get_masks(thresholds))
+    sig_bits,exp_bits = compute_compression_rate(layers, model.get_masks(thresholds))
 
     print("Test error after with reduced bit precision:")
 
-    weights,biases = compute_reduced_weights(layers, model.get_masks(thresholds))
+    weights,biases = compute_reduced_weights(layers,model.get_masks(thresholds),
+                                             sig_bits,exp_bits)
     all_files = []
 
     vals_path = BASE_PATH+'vals'

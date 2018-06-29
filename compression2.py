@@ -144,24 +144,25 @@ def compute_compression_rate(layers, masks):
     highest_weights = [np.max(np.abs(w)) for w in weight_mus]
     overflow = np.max(highest_weights)
     # compute compression rate
-    CR_architecture, CR_fast_inference, _, _ = _compute_compression_rate(
+    CR_architecture, CR_fast_inference, sig_bits, exp_bits = _compute_compression_rate(
         weight_vars, dist_fun=lambda x: np.mean(x), overflow=overflow)
     print("Compressing the architecture will degrease the model by a factor of %.1f." % (
         CR_architecture))
     print("Making use of weight uncertainty can reduce the model by a factor of %.1f." % (
         CR_fast_inference))
+    return sig_bits,exp_bits
 
 
-def compute_reduced_weights(layers, masks, prune=False):
+def compute_reduced_weights(layers, masks, significant_bits, exponent_bits,prune=False):
     print ("Computing reduced weights")
     global prev_conv_shape
     weight_mus, weight_vars, bias_mus = extract_pruned_params(
         layers, wt_masks=masks[0], bs_masks=masks[1])
-    overflow = np.max([np.max(np.abs(w)) for w in weight_mus])
-    prev_conv_shape = None
-    _, _, significant_bits, exponent_bits = _compute_compression_rate(
-        weight_vars, dist_fun=lambda x: np.mean(x), overflow=overflow)
-
+    print ("Pruned params extracted")
+    # prev_conv_shape = None
+    # overflow = np.max([np.max(np.abs(w)) for w in weight_mus])
+    # _, _, significant_bits, exponent_bits = _compute_compression_rate(weight_vars, dist_fun=lambda x: np.mean(x), overflow=overflow)
+    # print ("Compression rate calcuated")
     if prune:
 
         print ("Pruning weights now :")
