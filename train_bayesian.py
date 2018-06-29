@@ -308,7 +308,12 @@ else:
         train(epoch)
         test(epoch)
 
-    pickle_fname = BASE_PATH + "vals/ep_"+str(max_epochs)+"_darknet_bayes.pkl"
+    vals_path = BASE_PATH+'vals'
+    if not os.path.exists(vals_path):
+        os.mkdir(vals_path)
+    print ("MODEL SAVE TO PICKLE")
+    
+    pickle_fname = vals_path + "/ep_"+str(max_epochs)+"_darknet_bayes.pkl"
     torch.save(model.state_dict(), pickle_fname)
     print ("model")
 
@@ -338,10 +343,6 @@ else:
     weights,biases = compute_reduced_weights(layers,model.get_masks(thresholds),
                                              sig_bits,exp_bits)
     all_files = []
-
-    vals_path = BASE_PATH+'vals'
-    if not os.path.exists(vals_path):
-        os.mkdir(vals_path)
 
     for i, (layer, weight, bias, block_i) in enumerate(zip(layers, weights, biases,model.conv_blocks_indices)):
         layer.post_weight_mu = torch.Tensor(weight).cuda()
