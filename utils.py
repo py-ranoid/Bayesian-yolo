@@ -486,7 +486,7 @@ def header_gen(files, fname_save):
     types = []
     num_total = 0
     for fname in files:
-        print (fname)
+        # print (fname)
         layer = re.findall('.*lr([0-9])*_.*(wt|bs)', fname)[0]
         with open(fname, 'r') as f:
             contents = f.read().strip()
@@ -497,11 +497,11 @@ def header_gen(files, fname_save):
         header = '#include "ap_int.h"\n#include "ap_fixed.h'
 
         lookup = list(set(nums))
-        indices = [lookup.index(i) for i in nums]
+        indices = [str(lookup.index(i)) for i in nums]
 
 
         num_lookup = (len(lookup))
-        print (num_lookup, lookup)
+        # print (num_lookup, lookup)
         num_bits = int(np.ceil(np.log2(num_lookup)))
         vals_type = 'bit' + str(num_bits) + '_t'
         types.append((num_bits, vals_type))
@@ -523,7 +523,6 @@ def header_gen(files, fname_save):
         td = '\ntypedef ap_uint<' + str(num) + '> ' + vtype + ';'
         header += td
     header += decs
-    print (num_total)
-    print (fname_save)
+    print (fname_save,'num_total :',num_total)
     with open(fname_save, 'w') as f:
         f.write(header)
