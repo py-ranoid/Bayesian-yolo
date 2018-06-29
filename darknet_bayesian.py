@@ -4,8 +4,13 @@ import torch.nn.functional as F
 import numpy as np
 from region_loss import RegionLoss
 from cfg import *
-import BayesianLayers
-from compression import compute_compression_rate, compute_reduced_weights
+import BayesianLayers2 as BayesianLayers
+from datetime import datetime
+from os import mkdir
+from glob import glob
+
+# import BayesianLayers
+# from compression import compute_compression_rate, compute_reduced_weights
 
 #from layers.batchnorm.bn import BN2d
 
@@ -64,6 +69,7 @@ class Darknet(nn.Module):
     def __init__(self, cfgfile):
         super(Darknet, self).__init__()
         self.blocks = parse_cfg(cfgfile)
+        self.conv_blocks_indices = [i for i,b in enumerate(self.blocks) if b['type']== 'convolutional']
         self.models = self.create_network(self.blocks) # merge conv, bn,leaky
 
         self.kl_list = [self.models[0].conv1, self.models[2].conv2,self.models[4].conv3,self.models[6].conv4,self.models[8].conv5,self.models[10].conv6,self.models[12].conv7,self.models[13].conv8,self.models[14].conv9]
@@ -81,46 +87,110 @@ class Darknet(nn.Module):
         self.header = torch.IntTensor([0,0,0,0])
         self.seen = 0
 
-
-    def get_masks(self,thresholds,layers):
+    def get_masks(self, thresholds):
+        layers = self.kl_list
         weight_masks = []
+        bias_masks = []
         conv_mask = None
         lin_mask = None
         for i, (layer, threshold) in enumerate(zip(self.kl_list, thresholds)):
             # compute dropout mask
             if layer.get_type() == 'conv':
                 if conv_mask is None:
-                    mask = [True]*layer.in_channels
+                    mask = [True] * layer.in_channels
                 else:
                     mask = np.copy(conv_mask)
 
-                log_alpha = layers[i].get_log_dropout_rates().cpu().data.numpy()
+                # print ("CONV:", np.array(mask).shape)
+                log_alpha = layers[i].get_log_dropout_rates(
+                ).cpu().data.numpy()
                 conv_mask = log_alpha < thresholds[i]
+                # print ("CONV-MASK:", conv_mask.shape)
+                # print (layer.bias_mu.shape)
 
-                print(np.sum(mask),np.sum(conv_mask))
+                # print(np.sum(mask), np.sum(conv_mask))
 
-                weight_mask = np.expand_dims(mask, axis=0) * np.expand_dims(conv_mask, axis=1)
-                weight_mask = weight_mask[:,:,None,None]
+                weight_mask = np.expand_dims(
+                    mask, axis=0) * np.expand_dims(conv_mask, axis=1)
+                weight_mask = weight_mask[:, :, None, None]
+                bias_mask = conv_mask
             else:
                 if lin_mask is None:
-                    mask = conv_mask.repeat(layer.in_features/conv_mask.shape[0])
+                    mask = conv_mask.repeat(
+                        layer.in_features / conv_mask.shape[0])
                 else:
                     mask = np.copy(lin_mask)
-
+                # print ("LIN:", mask.shape)
                 try:
-                    log_alpha = layers[i + 1].get_log_dropout_rates().cpu().data.numpy()
+                    log_alpha = layers[i +
+                                       1].get_log_dropout_rates().cpu().data.numpy()
                     lin_mask = log_alpha < thresholds[i + 1]
                 except:
                     # must be the last mask
                     lin_mask = np.ones(10)
+                # print ("LIN-MASK:", lin_mask.shape)
+                # print (layer.bias_mu.shape)
+                # print(np.sum(mask), np.sum(lin_mask))
 
-                print(np.sum(mask),np.sum(lin_mask))
-
-                weight_mask = np.expand_dims(mask, axis=0) * np.expand_dims(lin_mask, axis=1)
+                weight_mask = np.expand_dims(
+                    mask, axis=0) * np.expand_dims(lin_mask, axis=1)
+                bias_mask = lin_mask
 
             weight_masks.append(weight_mask.astype(np.float))
+            bias_masks.append(bias_mask.astype(np.float))
+        return weight_masks, bias_masks
 
-        return weight_masks
+        # def get_masks(self, thresholds):
+        #     weight_masks = []
+        #     bias_masks = []
+        #     conv_mask = None
+        #     lin_mask = None
+        #     for i, (layer, threshold) in enumerate(zip(self.kl_list, thresholds)):
+        #         # compute dropout mask
+        #         if layer.get_type() == 'conv':
+        #             if conv_mask is None:
+        #                 mask = [True] * layer.in_channels
+        #             else:
+        #                 mask = np.copy(conv_mask)
+        #
+        #             # print ("CONV:", np.array(mask).shape)
+        #             log_alpha = layers[i].get_log_dropout_rates(
+        #             ).cpu().data.numpy()
+        #             conv_mask = log_alpha < thresholds[i]
+        #             # print ("CONV-MASK:", conv_mask.shape)
+        #             # print (layer.bias_mu.shape)
+        #
+        #             # print(np.sum(mask), np.sum(conv_mask))
+        #
+        #             weight_mask = np.expand_dims(
+        #                 mask, axis=0) * np.expand_dims(conv_mask, axis=1)
+        #             weight_mask = weight_mask[:, :, None, None]
+        #             bias_mask = conv_mask
+        #         else:
+        #             if lin_mask is None:
+        #                 mask = conv_mask.repeat(
+        #                     layer.in_features / conv_mask.shape[0])
+        #             else:
+        #                 mask = np.copy(lin_mask)
+        #             # print ("LIN:", mask.shape)
+        #             try:
+        #                 log_alpha = layers[i +
+        #                                    1].get_log_dropout_rates().cpu().data.numpy()
+        #                 lin_mask = log_alpha < thresholds[i + 1]
+        #             except:
+        #                 # must be the last mask
+        #                 lin_mask = np.ones(10)
+        #             # print ("LIN-MASK:", lin_mask.shape)
+        #             # print (layer.bias_mu.shape)
+        #             # print(np.sum(mask), np.sum(lin_mask))
+        #
+        #             weight_mask = np.expand_dims(
+        #                 mask, axis=0) * np.expand_dims(lin_mask, axis=1)
+        #             bias_mask = lin_mask
+        #
+        #         weight_masks.append(weight_mask.astype(np.float))
+        #         bias_masks.append(bias_mask.astype(np.float))
+        #     return weight_masks, bias_masks
 
     def kl_divergence(self):
         KLD = 0
@@ -128,7 +198,7 @@ class Darknet(nn.Module):
             KLD += layer.kl_divergence()
         return KLD
 
-            
+
     def forward(self, x):
         ind = -2
         self.loss = None
@@ -185,7 +255,7 @@ class Darknet(nn.Module):
     def create_network(self, blocks):
         models = nn.ModuleList()
         # print (models)
-    
+
         prev_filters = 3
         out_filters =[]
         conv_id = 0
@@ -300,7 +370,7 @@ class Darknet(nn.Module):
                 models.append(loss)
             else:
                 print('unknown type %s' % (block['type']))
-    
+
 
         return models
 
@@ -330,29 +400,29 @@ class Darknet(nn.Module):
                     # start = load_conv_bn(buf, start, model[0], model[1])
                     num_w = conv_model.weight_mu.numel()
                     num_b = bn_model.bias.numel()
-                    # bn_model.bias.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.bias.shape[0],bn_model.bias.shape[1], bn_model.bias.shape[2],bn_model.bias.shape[3])))    
+                    # bn_model.bias.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.bias.shape[0],bn_model.bias.shape[1], bn_model.bias.shape[2],bn_model.bias.shape[3])))
                     # start = start + num_b
-                    # bn_model.weight.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.weight.shape[0],bn_model.weight.shape[1], bn_model.weight.shape[2],bn_model.weight.shape[3]))) 
+                    # bn_model.weight.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.weight.shape[0],bn_model.weight.shape[1], bn_model.weight.shape[2],bn_model.weight.shape[3])))
                     # start = start + num_b
                     # bn_model.running_mean.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.running_mean.shape[0],bn_model.running_mean.shape[1], bn_model.running_mean.shape[2],bn_model.running_mean.shape[3])));
                     # start = start + num_b
-                    # bn_model.running_var.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.running_var.shape[0],bn_model.running_var.shape[1], bn_model.running_var.shape[2],bn_model.running_var.shape[3])));  
+                    # bn_model.running_var.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.running_var.shape[0],bn_model.running_var.shape[1], bn_model.running_var.shape[2],bn_model.running_var.shape[3])));
                     # start = start + num_b
                     bn_model.bias.data.copy_(torch.from_numpy(buf[start:start+num_b]));     start = start + num_b
                     bn_model.weight.data.copy_(torch.from_numpy(buf[start:start+num_b]));   start = start + num_b
                     bn_model.running_mean.copy_(torch.from_numpy(buf[start:start+num_b]));  start = start + num_b
                     bn_model.running_var.copy_(torch.from_numpy(buf[start:start+num_b]));   start = start + num_b
 
-                    conv_model.weight_mu.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(conv_model.weight_mu.shape[0],conv_model.weight_mu.shape[1], conv_model.weight_mu.shape[2],conv_model.weight_mu.shape[3])));  
-                    start = start + num_w 
+                    conv_model.weight_mu.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(conv_model.weight_mu.shape[0],conv_model.weight_mu.shape[1], conv_model.weight_mu.shape[2],conv_model.weight_mu.shape[3])));
+                    start = start + num_w
 
                 else:
                     conv_model = model[0]
                     num_w = conv_model.weight_mu.numel()
                     num_b = conv_model.bias_mu.numel()
-                    conv_model.bias_mu.data.copy_(torch.from_numpy(buf[start:start+num_b])); 
+                    conv_model.bias_mu.data.copy_(torch.from_numpy(buf[start:start+num_b]));
                     start = start + num_b
-                    conv_model.weight_mu.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(conv_model.weight_mu.shape[0],conv_model.weight_mu.shape[1], conv_model.weight_mu.shape[2],conv_model.weight_mu.shape[3]))); 
+                    conv_model.weight_mu.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(conv_model.weight_mu.shape[0],conv_model.weight_mu.shape[1], conv_model.weight_mu.shape[2],conv_model.weight_mu.shape[3])));
                     start = start + num_w
                 #     start = load_conv(buf, start, model[0])
             elif block['type'] == 'connected':
@@ -379,6 +449,52 @@ class Darknet(nn.Module):
                 pass
             else:
                 print('unknown type %s' % (block['type']))
+
+    def load_weights_txt (self,folder_path):
+        weight_files = glob(folder_path+'/*wt.txt')
+        weight_files.sort()
+
+        bias_files = glob(folder_path+'/*bs.txt')
+        bias_files.sort()
+
+        for l,wt_file,bs_file in zip(self.kl_list,weight_files,bias_files):
+            wt_loaded = np.loadtxt(wt_file)
+            bs_loaded = np.loadtxt(bs_file)
+            new_wt = torch.from_numpy(wt_loaded).view(l.weight_mu.shape).float()
+            new_bs = torch.from_numpy(bs_loaded).view(l.bias_mu.shape).float()
+            l.post_weight_mu = new_wt.cuda()
+            l.post_bias_mu = new_bs.cuda()
+            l.deterministic = True
+
+    def save_weights_txt (self,epochs,vals_path,after=True):
+        all_files = []
+        now = datetime.now()
+        status = 'POST' if after else 'PRE'
+        folder = ['weights',status,'ep'+str(epochs), str(now.hour),str(now.minute)]
+        folder_name = '_'.join(folder)
+
+        vals_path += '/'+folder_name
+        mkdir(vals_path)
+
+        for i,l in enumerate(self.kl_list):
+            weight = l.post_weight_mu.cpu().data.numpy()
+            bias = l.post_bias_mu.cpu().data.numpy()
+
+            new_weight = weight.astype(np.float16).reshape(-1)
+            new_bias = bias.astype(np.float16).reshape(-1)
+
+            fname = 'lr' + str(i) + '_ep' + str(epochs) + '_'
+
+            wt_fname = vals_path + '/' + fname + 'wt.txt'
+            bs_fname = vals_path + '/' + fname + 'bs.txt'
+
+            np.savetxt(wt_fname, new_weight)
+            np.savetxt(bs_fname, new_bias)
+
+            all_files.append(wt_fname)
+            all_files.append(bs_fname)
+        return all_files,vals_path
+
 
     def save_weights(self, outfile, cutoff=0):
         if cutoff <= 0:

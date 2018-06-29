@@ -1,4 +1,3 @@
-# from darknet import Darknet
 from darknet_bayesian import Darknet
 import dataset
 import torch
@@ -24,6 +23,7 @@ def valid(datacfg, cfgfile, weightfile, outfile):
     m.load_state_dict(torch.load(weightfile))
     m.print_network()
     # m.load_weights(weightfile)
+
     m.cuda()
     m.eval()
 
@@ -89,7 +89,7 @@ def valid(datacfg, cfgfile, weightfile, outfile):
                 y2 = (box[1] + box[3]/2.0) * height
 
                 det_conf = box[4]
-                for j in range((len(box)-5)/2):
+                for j in range(int((len(box)-5)/2)):
                     cls_conf = box[5+2*j]
                     cls_id = box[6+2*j]
                     prob =det_conf * cls_conf

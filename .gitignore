@@ -9,4 +9,7 @@
 VOCdevkit/*
 20*
 VOC*
-*.23
+output/*
+results/*
+voc_label*
+voc_train.txt

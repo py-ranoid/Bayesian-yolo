@@ -1,6 +1,14 @@
 import torch
 from utils import convert2cpu
 
+def save_cfg(blocks,destination):
+    def block2text(x):
+        string = '['+x['type']+']\n'
+        return string + '\n'.join("{!s}={!s}".format(key,val) for (key,val) in x.items())
+    content =  '\n\n'.join([block2text(x) for x in parse_cfg('cfg/tiny-yolo-voc.cfg')])
+    with open(destination,'w') as f:
+        f.write(content)
+    print ("Saved config to",destination)
 
 def parse_cfg(cfgfile):
     blocks = []

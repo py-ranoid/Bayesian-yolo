@@ -1,36 +1,45 @@
 from __future__ import print_function
 import sys
-if len(sys.argv) != 4:
+import time
+import os
+
+BASE_PATH = '/gandiva-store/user1/pytorch-yolo2/' if os.environ.get('GANDIVA_USER') else './'
+if os.environ.get('GANDIVA_USER',None):
+    log_path = BASE_PATH + 'logs/'
+    if not os.path.exists(log_path):
+        os.mkdir(log_path)
+
+    log_file = open(log_path+'log_'+str(int(time.time())),"w")
+    sys.stdout = log_file
+    sys.stderr = log_file
+
+if len(sys.argv) != 5:
     print('Usage:')
     print('python train.py datacfg cfgfile weightfile')
     exit()
 
-import time
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
-import torch.backends.cudnn as cudnn
-from torchvision import datasets, transforms
+from torchvision import transforms
 from torch.autograd import Variable
 
 import dataset
-import random
-import math
-import os
+import numpy as np
 from utils import *
-from cfg import parse_cfg
-from region_loss import RegionLoss
+from cfg import parse_cfg,save_cfg
 # from darknet import Darknet
+from matplotlib import pyplot as plt
 from darknet_bayesian import Darknet
-from models.tiny_yolo import TinyYoloNet
-import BayesianLayers
-from compression import compute_compression_rate, compute_reduced_weights
+from compression2 import compute_compression_rate, compute_reduced_weights
+
+# from compression import compute_compression_rate, compute_reduced_weights
 
 # Training settings
 datacfg       = sys.argv[1]
 cfgfile       = sys.argv[2]
 weightfile    = sys.argv[3]
+epochs_arg    = int(sys.argv[4])
+
 
 data_options  = read_data_cfg(datacfg)
 net_options   = parse_cfg(cfgfile)[0]
@@ -53,7 +62,7 @@ steps         = [float(step) for step in net_options['steps'].split(',')]
 scales        = [float(scale) for scale in net_options['scales'].split(',')]
 
 #Train parameters
-max_epochs    = max_batches*batch_size/nsamples+1
+max_epochs    = int(max_batches*batch_size/nsamples)+1
 use_cuda      = True
 seed          = int(time.time())
 eps           = 1e-5
@@ -65,10 +74,9 @@ conf_thresh   = 0.25
 nms_thresh    = 0.4
 iou_thresh    = 0.5
 
-print (max_epochs)
 if not os.path.exists(backupdir):
     os.mkdir(backupdir)
-    
+
 ###############
 torch.manual_seed(seed)
 if use_cuda:
@@ -86,7 +94,7 @@ processed_batches = model.seen/batch_size
 
 init_width        = model.width
 init_height       = model.height
-init_epoch        = model.seen/nsamples 
+init_epoch        = model.seen/nsamples
 
 kwargs = {'num_workers': num_workers, 'pin_memory': True} if use_cuda else {}
 test_loader = torch.utils.data.DataLoader(
@@ -98,14 +106,12 @@ test_loader = torch.utils.data.DataLoader(
                    ]), train=False),
     batch_size=batch_size, shuffle=False, **kwargs)
 
-# if use_cuda:
-#     if ngpus > 1:
-#         model = torch.nn.DataParallel(model).cuda()
-#     else:
-#         model = model.cuda()
+if use_cuda:
+    if ngpus > 1:
+        model = torch.nn.DataParallel(model).cuda()
+    else:
+        model = model.cuda()
 
-
-model = model.cuda()
 params_dict = dict(model.named_parameters())
 params = []
 for key, value in params_dict.items():
@@ -113,7 +119,7 @@ for key, value in params_dict.items():
         params += [{'params': [value], 'weight_decay': 0.0}]
     else:
         params += [{'params': [value], 'weight_decay': decay*batch_size}]
-        
+
 optimizer = optim.SGD(model.parameters(), lr=learning_rate/batch_size, momentum=momentum, dampening=0, weight_decay=decay*batch_size)
 # optimizer = optim.Adam(model.parameters(), lr=learning_rate/batch_size,weight_decay=decay*batch_size)
 
@@ -163,8 +169,8 @@ def train(epoch):
                        transform=transforms.Compose([
                            transforms.ToTensor(),
                            lambda x: 2 * (x - 0.5)
-                       ]), 
-                       train=True, 
+                       ]),
+                       train=True,
                        seen=cur_model.seen,
                        batch_size=batch_size,
                        num_workers=num_workers),
@@ -206,7 +212,7 @@ def train(epoch):
 
         for layer in model.kl_list:
                 layer.clip_variances()
-                
+
         if False and batch_idx > 1:
             avg_time[0] = avg_time[0] + (t2-t1)
             avg_time[1] = avg_time[1] + (t3-t2)
@@ -235,7 +241,7 @@ def train(epoch):
     #     logging('save weights to %s/%06d.weights' % (backupdir, epoch+1))
     #     cur_model.seen = (epoch + 1) * len(train_loader.dataset)
     #     cur_model.save_weights('%s/%06d.weights' % (backupdir, epoch+1))
-    
+
 
 def test(epoch):
     def truths_length(truths):
@@ -266,9 +272,9 @@ def test(epoch):
             boxes = nms(boxes, nms_thresh)
             truths = target[i].view(-1, 5)
             num_gts = truths_length(truths)
-     
+
             total = total + num_gts
-    
+
             for i in range(len(boxes)):
                 if boxes[i][4] > conf_thresh:
                     proposals = proposals+1
@@ -295,31 +301,62 @@ if evaluate:
     logging('evaluating ...')
     test(0)
 else:
-    max_epochs = 60
-    for epoch in range(init_epoch, max_epochs): 
-    # for epoch in range(0, 5): 
+
+    print ("MAX EPOCHS :",max_epochs)
+    print ("USING EPOCHS :",epochs_arg)
+    for epoch in range(init_epoch, epochs_arg):
+    # for epoch in range(0, 5):
         train(epoch)
         test(epoch)
 
-        # if epoch % 20 ==0:
-    torch.save(model.state_dict(), "darknet_bayes_60.pkl")
+    vals_path = BASE_PATH+'vals'
+    if not os.path.exists(vals_path):
+        os.mkdir(vals_path)
+    print ("MODEL SAVE TO PICKLE")
+
+    pickle_fname = vals_path + "/ep_"+str(max_epochs)+"_darknet_bayes.pkl"
+    torch.save(model.state_dict(), pickle_fname)
     print ("model")
 
     layers = [model.models[0].conv1, model.models[2].conv2,model.models[4].conv3,model.models[6].conv4,model.models[8].conv5,model.models[10].conv6,model.models[12].conv7,model.models[13].conv8,model.models[14].conv9]
     thresholds = [-3,-3,-3,-3,-3,-3,-3,-3,-3]
-    compute_compression_rate(layers, model.get_masks(thresholds,layers))
+    log_alphas = [l.get_log_dropout_rates() for l in layers]
 
+    thresh_path = BASE_PATH+'thresh_plots'
+    if not os.path.exists(thresh_path):
+        os.mkdir(thresh_path)
+    for lr,lar in enumerate(log_alphas):
+        plt.hist(lar.cpu().data.numpy(), bins=80)
+        plt.xlabel('Threshold')
+        plt.ylabel('# Groups')
+        plt.savefig(thresh_path+'/lenet_%d_epochs_layer%d' %
+                    (max_epochs, lr))
+        # plt.show()
+        plt.close()
+
+
+
+
+    sig_bits,exp_bits = compute_compression_rate(layers, model.get_masks(thresholds))
 
     print("Test error after with reduced bit precision:")
 
-    weights = compute_reduced_weights(layers, model.get_masks(thresholds,layers))
-    for layer, weight in zip(layers, weights):
-        if True:
-            layer.post_weight_mu.data = torch.Tensor(weight).cuda()
-        else:
-            layer.post_weight_mu.data = torch.Tensor(weight)
+    weights,biases = compute_reduced_weights(layers,model.get_masks(thresholds),
+                                             sig_bits,exp_bits)
+    all_files = []
+
+    for i, (layer, weight, bias, block_i) in enumerate(zip(layers, weights, biases,model.conv_blocks_indices)):
+        layer.post_weight_mu = torch.Tensor(weight).cuda()
+        layer.post_bias_mu = (torch.Tensor(bias).cuda())
+        model.blocks[block_i]['filters'] = int(layer.post_bias_mu.shape[0])
+
+    paths,vals_path = model.save_weights_txt(max_epochs,vals_path,after=True)
+    save_cfg(model.blocks,vals_path+'/output.cfg')
+    header_gen(paths,vals_path +'/header_ep' + str(max_epochs)+'.h')
+
     for layer in layers: layer.deterministic = True
-    test(epoch)
 
+    test(0)
 
-
+if os.environ.get('GANDIVA_USER',None):
+    log_file.close()
