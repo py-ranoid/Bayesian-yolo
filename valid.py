@@ -1,4 +1,4 @@
-from darknet import Darknet
+from darknet_bayesian import Darknet
 import dataset
 import torch
 from torch.autograd import Variable
@@ -19,7 +19,11 @@ def valid(datacfg, cfgfile, weightfile, outfile):
 
     m = Darknet(cfgfile)
     m.print_network()
-    m.load_weights(weightfile)
+    print ("Loading :",weightfile)
+    if os.path.isfile(weightfile):
+        m.load_weights(weightfile)
+    else:
+        m.load_weights_txt(weightfile)
     m.cuda()
     m.eval()
 
