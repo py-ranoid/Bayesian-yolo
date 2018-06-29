@@ -1,18 +1,29 @@
 from __future__ import print_function
 import sys
+import time
+import os
+
+BASE_PATH = '/gandiva-store/user1/pytorch-yolo2/' if os.environ.get('GANDIVA_USER') else './'
+if os.environ.get('GANDIVA_USER',None):
+    log_path = BASE_PATH + 'logs/'
+    if not os.path.exists(log_path):
+        os.mkdir(log_path)
+
+    log_file = open(log_path+'log_'+str(int(time.time())),"w")
+    sys.stdout = log_file
+    sys.stderr = log_file
+
 if len(sys.argv) != 4:
     print('Usage:')
     print('python train.py datacfg cfgfile weightfile')
     exit()
 
-import time
 import torch
 import torch.optim as optim
 from torchvision import transforms
 from torch.autograd import Variable
 
 import dataset
-import os
 import numpy as np
 from utils import *
 from cfg import parse_cfg,save_cfg
@@ -21,7 +32,6 @@ from matplotlib import pyplot as plt
 from darknet_bayesian import Darknet
 from compression2 import compute_compression_rate, compute_reduced_weights
 
-BASE_PATH = '/gandiva-store/user1/pytorch-yolo2/' if os.environ.get('GANDIVA_USER') else './'
 # from compression import compute_compression_rate, compute_reduced_weights
 
 # Training settings
@@ -294,7 +304,6 @@ if evaluate:
 else:
     print ("MAX EPOCHS :",max_epochs)
     for epoch in range(init_epoch, max_epochs):
-        break
     # for epoch in range(0, 5):
         train(epoch)
         test(epoch)
@@ -345,4 +354,7 @@ else:
 
     for layer in layers: layer.deterministic = True
 
-    # test(0)
+    test(0)
+
+if os.environ.get('GANDIVA_USER',None):
+    log_file.close()

@@ -468,8 +468,8 @@ class Darknet(nn.Module):
 
     def save_weights_txt (self,epochs,vals_path,after=True):
         all_files = []
-        now = datetime.now()'PRE'
-        status = 'POST' if after else
+        now = datetime.now()
+        status = 'POST' if after else 'PRE'
         folder = ['weights',status,'ep'+str(epochs), str(now.hour),str(now.minute)]
         folder_name = '_'.join(folder)
 
