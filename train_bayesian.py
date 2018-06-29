@@ -13,7 +13,7 @@ if os.environ.get('GANDIVA_USER',None):
     sys.stdout = log_file
     sys.stderr = log_file
 
-if len(sys.argv) != 4:
+if len(sys.argv) != 5:
     print('Usage:')
     print('python train.py datacfg cfgfile weightfile')
     exit()
@@ -38,6 +38,7 @@ from compression2 import compute_compression_rate, compute_reduced_weights
 datacfg       = sys.argv[1]
 cfgfile       = sys.argv[2]
 weightfile    = sys.argv[3]
+epochs_arg    = int(sys.argv[4])
 
 
 data_options  = read_data_cfg(datacfg)
@@ -105,14 +106,12 @@ test_loader = torch.utils.data.DataLoader(
                    ]), train=False),
     batch_size=batch_size, shuffle=False, **kwargs)
 
-# if use_cuda:
-#     if ngpus > 1:
-#         model = torch.nn.DataParallel(model).cuda()
-#     else:
-#         model = model.cuda()
+if use_cuda:
+    if ngpus > 1:
+        model = torch.nn.DataParallel(model).cuda()
+    else:
+        model = model.cuda()
 
-
-model = model.cuda()
 params_dict = dict(model.named_parameters())
 params = []
 for key, value in params_dict.items():
@@ -303,7 +302,8 @@ if evaluate:
     test(0)
 else:
     print ("MAX EPOCHS :",max_epochs)
-    for epoch in range(init_epoch, max_epochs):
+    print ("USING EPOCHS :",epochs_arg)
+    for epoch in range(init_epoch, epochs_arg):
     # for epoch in range(0, 5):
         train(epoch)
         test(epoch)
@@ -312,7 +312,7 @@ else:
     if not os.path.exists(vals_path):
         os.mkdir(vals_path)
     print ("MODEL SAVE TO PICKLE")
-    
+
     pickle_fname = vals_path + "/ep_"+str(max_epochs)+"_darknet_bayes.pkl"
     torch.save(model.state_dict(), pickle_fname)
     print ("model")
