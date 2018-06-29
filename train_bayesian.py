@@ -15,7 +15,7 @@ import dataset
 import os
 import numpy as np
 from utils import *
-from cfg import parse_cfg
+from cfg import parse_cfg,save_cfg
 # from darknet import Darknet
 from matplotlib import pyplot as plt
 from darknet_bayesian import Darknet
