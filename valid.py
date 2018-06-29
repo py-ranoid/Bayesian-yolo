@@ -1,4 +1,5 @@
-from darknet import Darknet
+# from darknet import Darknet
+from darknet_bayesian import Darknet
 import dataset
 import torch
 from torch.autograd import Variable
@@ -16,25 +17,47 @@ def valid(datacfg, cfgfile, weightfile, outfile):
     with open(valid_images) as fp:
         tmp_files = fp.readlines()
         valid_files = [item.rstrip() for item in tmp_files]
-
+    
     m = Darknet(cfgfile)
+
+    # m.load_state_dict(torch.load("darknet_bayes_60.pkl"))
+    m.load_state_dict(torch.load(weightfile))
     m.print_network()
-    m.load_weights(weightfile)
+    # m.load_weights(weightfile)
     m.cuda()
     m.eval()
+
+#################################################
+
+    layers = [m.models[0].conv1, m.models[2].conv2,m.models[4].conv3,m.models[6].conv4,m.models[8].conv5,m.models[10].conv6,m.models[12].conv7,m.models[13].conv8,m.models[14].conv9]
+    thresholds = [-3,-3,-3,-3,-3,-3,-3,-3,-3]
+    compute_compression_rate(layers, m.get_masks(thresholds,layers))
+
+
+    print("Test error after with reduced bit precision:")
+
+    weights = compute_reduced_weights(layers, m.get_masks(thresholds,layers))
+    for layer, weight in zip(layers, weights):
+        if True:
+            layer.post_weight_mu.data = torch.Tensor(weight).cuda()
+        else:
+            layer.post_weight_mu.data = torch.Tensor(weight)
+    for layer in layers: layer.deterministic = True
+
+
+##########################################
 
     valid_dataset = dataset.listDataset(valid_images, shape=(m.width, m.height),
                        shuffle=False,
                        transform=transforms.Compose([
                            transforms.ToTensor(),
-                           lambda x: 2 * (x - 0.5)
                        ]))
     valid_batchsize = 2
     assert(valid_batchsize > 1)
 
     kwargs = {'num_workers': 4, 'pin_memory': True}
     valid_loader = torch.utils.data.DataLoader(
-        valid_dataset, batch_size=valid_batchsize, shuffle=False, **kwargs)
+        valid_dataset, batch_size=valid_batchsize, shuffle=False, **kwargs) 
 
     fps = [0]*m.num_classes
     if not os.path.exists('results'):
@@ -42,9 +65,9 @@ def valid(datacfg, cfgfile, weightfile, outfile):
     for i in range(m.num_classes):
         buf = '%s/%s%s.txt' % (prefix, outfile, names[i])
         fps[i] = open(buf, 'w')
-
+   
     lineId = -1
-
+    
     conf_thresh = 0.005
     nms_thresh = 0.45
     for batch_idx, (data, target) in enumerate(valid_loader):

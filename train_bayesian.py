@@ -295,12 +295,14 @@ if evaluate:
     logging('evaluating ...')
     test(0)
 else:
+    max_epochs = 60
     for epoch in range(init_epoch, max_epochs): 
     # for epoch in range(0, 5): 
         train(epoch)
         test(epoch)
 
-    torch.save(model.state_dict(), "darknet_bayes.pkl")
+        # if epoch % 20 ==0:
+    torch.save(model.state_dict(), "darknet_bayes_60.pkl")
     print ("model")
 
     layers = [model.models[0].conv1, model.models[2].conv2,model.models[4].conv3,model.models[6].conv4,model.models[8].conv5,model.models[10].conv6,model.models[12].conv7,model.models[13].conv8,model.models[14].conv9]
