@@ -69,6 +69,7 @@ class Darknet(nn.Module):
     def __init__(self, cfgfile):
         super(Darknet, self).__init__()
         self.blocks = parse_cfg(cfgfile)
+        self.conv_blocks_indices = [i for i,b in enumerate(self.blocks) if b['type']== 'convolutional']
         self.models = self.create_network(self.blocks) # merge conv, bn,leaky
 
         self.kl_list = [self.models[0].conv1, self.models[2].conv2,self.models[4].conv3,self.models[6].conv4,self.models[8].conv5,self.models[10].conv6,self.models[12].conv7,self.models[13].conv8,self.models[14].conv9]

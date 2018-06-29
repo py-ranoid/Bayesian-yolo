@@ -294,6 +294,7 @@ if evaluate:
 else:
     print ("MAX EPOCHS :",max_epochs)
     for epoch in range(init_epoch, max_epochs):
+        break
     # for epoch in range(0, 5):
         train(epoch)
         test(epoch)
@@ -344,4 +345,4 @@ else:
 
     for layer in layers: layer.deterministic = True
 
-    test(0)
+    # test(0)
