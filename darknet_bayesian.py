@@ -275,13 +275,23 @@ class Darknet(nn.Module):
                 model = nn.Sequential()
                 if batch_normalize:
                     # model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, pad, bias=False))
+                    if conv_id ==1 or conv_id ==2:
+                        model.add_module('conv{0}'.format(conv_id), BayesianLayers.Conv2dGroupNJ(prev_filters, filters, kernel_size,stride,pad,clip_var = 0.01,bias=False,cuda=True))
+                    elif conv_id ==3 or conv_id ==4:
+                        model.add_module('conv{0}'.format(conv_id), BayesianLayers.Conv2dGroupNJ(prev_filters, filters, kernel_size,stride,pad,clip_var=0.04,bias=False,cuda=True))
+                    else:
+                        model.add_module('conv{0}'.format(conv_id), BayesianLayers.Conv2dGroupNJ(prev_filters, filters, kernel_size,stride,pad,bias=False,cuda=True))
 
-                    model.add_module('conv{0}'.format(conv_id), BayesianLayers.Conv2dGroupNJ(prev_filters, filters, kernel_size,stride,pad,bias=False,cuda=True))
                     model.add_module('bn{0}'.format(conv_id), nn.BatchNorm2d(filters))
                     #model.add_module('bn{0}'.format(conv_id), BN2d(filters))
                 else:
                     # model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, pad))
-                    model.add_module('conv{0}'.format(conv_id), BayesianLayers.Conv2dGroupNJ(prev_filters, filters, kernel_size,stride,pad,cuda=True))
+                    if conv_id ==1 or conv_id ==2:
+                        model.add_module('conv{0}'.format(conv_id), BayesianLayers.Conv2dGroupNJ(prev_filters, filters, kernel_size,stride,pad,clip_var = 0.01,cuda=True))
+                    elif conv_id ==3 or conv_id ==4:
+                        model.add_module('conv{0}'.format(conv_id), BayesianLayers.Conv2dGroupNJ(prev_filters, filters, kernel_size,stride,pad,clip_var=0.04,cuda=True))
+                    else:
+                        model.add_module('conv{0}'.format(conv_id), BayesianLayers.Conv2dGroupNJ(prev_filters, filters, kernel_size,stride,pad,cuda=True))
 
 
                 if activation == 'leaky':
