@@ -11,5 +11,8 @@ VOCdevkit/*
 VOC*
 output/*
 results/*
+vals/*
+thresh_plots/*
+logs/*
 voc_label*
 voc_train.txt
