@@ -299,6 +299,7 @@ if evaluate:
     logging('evaluating ...')
     test(0)
 else:
+
     print ("MAX EPOCHS :",max_epochs)
     print ("USING EPOCHS :",epochs_arg)
     for epoch in range(init_epoch, epochs_arg):
