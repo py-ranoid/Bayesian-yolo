@@ -124,8 +124,7 @@ optimizer = optim.SGD(model.parameters(), lr=learning_rate/batch_size, momentum=
 # optimizer = optim.Adam(model.parameters(), lr=learning_rate/batch_size,weight_decay=decay*batch_size)
 
 
-print ([model.models[0].conv1, model.models[2].conv2,model.models[4].conv3,model.models[6].conv4,model.models[8].conv5,model.models[10].conv6,model.models[12].conv7,model.models[13].conv8,model.models[14].conv9])
-
+print (model.module.kl_list)
 
 def adjust_learning_rate(optimizer, batch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
@@ -158,11 +157,10 @@ def objective(output, target, kl_divergence):
 def train(epoch):
     global processed_batches
     t0 = time.time()
-    # if ngpus > 1:
-    #     cur_model = model.module
-    # else:
-
-    cur_model = model
+    if ngpus > 1:
+        cur_model = model.module
+    else:
+        cur_model = model
     train_loader = torch.utils.data.DataLoader(
         dataset.listDataset(trainlist, shape=(init_width, init_height),
                        shuffle=True,
@@ -201,7 +199,7 @@ def train(epoch):
         region_loss.seen = region_loss.seen + data.data.size(0)
 
         # loss = region_loss(output, target)
-        loss = objective(output, target, model.kl_divergence())
+        loss = objective(output, target, model.module.kl_divergence())
 
 
         t7 = time.time()
@@ -210,7 +208,7 @@ def train(epoch):
         optimizer.step()
         t9 = time.time()
 
-        for layer in model.kl_list:
+        for layer in model.module.kl_list:
                 layer.clip_variances()
 
         if False and batch_idx > 1:
@@ -250,10 +248,10 @@ def test(epoch):
                 return i
 
     model.eval()
-    # if ngpus > 1:
-    #     cur_model = model.module
-    # else:
-    cur_model = model
+    if ngpus > 1:
+        cur_model = model.module
+    else:
+        cur_model = model
     num_classes = cur_model.num_classes
     anchors     = cur_model.anchors
     num_anchors = cur_model.num_anchors
@@ -306,18 +304,20 @@ else:
     for epoch in range(init_epoch, epochs_arg):
     # for epoch in range(0, 5):
         train(epoch)
+        sys.stdout.flush()
         test(epoch)
+        sys.stdout.flush()
 
     vals_path = BASE_PATH+'vals'
     if not os.path.exists(vals_path):
         os.mkdir(vals_path)
     print ("MODEL SAVE TO PICKLE")
 
-    pickle_fname = vals_path + "/ep_"+str(max_epochs)+"_darknet_bayes.pkl"
+    pickle_fname = vals_path + "/ep_"+str(max_epochs)+"_darknet_bayes_+"+str(int(time.time()))+".pkl"
     torch.save(model.state_dict(), pickle_fname)
     print ("model")
 
-    layers = [model.models[0].conv1, model.models[2].conv2,model.models[4].conv3,model.models[6].conv4,model.models[8].conv5,model.models[10].conv6,model.models[12].conv7,model.models[13].conv8,model.models[14].conv9]
+    layers = model.module.kl_list
     thresholds = [-3,-3,-3,-3,-3,-3,-3,-3,-3]
     log_alphas = [l.get_log_dropout_rates() for l in layers]
 
@@ -325,32 +325,32 @@ else:
     if not os.path.exists(thresh_path):
         os.mkdir(thresh_path)
     for lr,lar in enumerate(log_alphas):
-        plt.hist(lar.cpu().data.numpy(), bins=80)
-        plt.xlabel('Threshold')
-        plt.ylabel('# Groups')
-        plt.savefig(thresh_path+'/lenet_%d_epochs_layer%d' %
-                    (max_epochs, lr))
+        fname = thresh_path +'/logalpha_ep'+str(epochs_arg)+'_'+str(int(time.time()))+'_lr'+str(lr)+'.txt'
+        np.savetxt(fname,lar.cpu().data.numpy())
+        # plt.hist(lar.cpu().data.numpy(), bins=80)
+        # plt.xlabel('Threshold')
+        # plt.ylabel('# Groups')
+        # plt.savefig(thresh_path+'/lenet_%d_epochs_layer%d' %
+                    # (max_epochs, lr))
         # plt.show()
-        plt.close()
+        # plt.close()
 
 
-
-
-    sig_bits,exp_bits = compute_compression_rate(layers, model.get_masks(thresholds))
+    sig_bits,exp_bits = compute_compression_rate(layers, model.module.get_masks(thresholds))
 
     print("Test error after with reduced bit precision:")
 
-    weights,biases = compute_reduced_weights(layers,model.get_masks(thresholds),
+    weights,biases = compute_reduced_weights(layers,model.module.get_masks(thresholds),
                                              sig_bits,exp_bits)
     all_files = []
 
-    for i, (layer, weight, bias, block_i) in enumerate(zip(layers, weights, biases,model.conv_blocks_indices)):
+    for i, (layer, weight, bias, block_i) in enumerate(zip(layers, weights, biases,model.module.conv_blocks_indices)):
         layer.post_weight_mu = torch.Tensor(weight).cuda()
         layer.post_bias_mu = (torch.Tensor(bias).cuda())
-        model.blocks[block_i]['filters'] = int(layer.post_bias_mu.shape[0])
+        model.module.blocks[block_i]['filters'] = int(layer.post_bias_mu.shape[0])
 
-    paths,vals_path = model.save_weights_txt(max_epochs,vals_path,after=True)
-    save_cfg(model.blocks,vals_path+'/output.cfg')
+    paths,vals_path = model.module.save_weights_txt(max_epochs,vals_path,after=True)
+    save_cfg(model.module.blocks,vals_path+'/output.cfg')
     header_gen(paths,vals_path +'/header_ep' + str(max_epochs)+'.h')
 
     for layer in layers: layer.deterministic = True
