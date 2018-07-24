@@ -3,9 +3,10 @@ import sys
 import time
 import os
 
-BASE_PATH = '/gandiva-store/user1/pytorch-yolo2/' if os.environ.get('GANDIVA_USER') else './'
+BASE_PATH = '/gandiva-store/user1/yolo/' if os.environ.get('GANDIVA_USER') else './'
 if os.environ.get('GANDIVA_USER',None):
     log_path = BASE_PATH + 'logs/'
+    print ("LOGGING TO",log_path)
     if not os.path.exists(log_path):
         os.mkdir(log_path)
 
@@ -94,8 +95,8 @@ processed_batches = model.seen/batch_size
 
 init_width        = model.width
 init_height       = model.height
-init_epoch        = model.seen/nsamples
-
+# init_epoch        = model.seen/nsamples
+init_epoch        = 1
 kwargs = {'num_workers': num_workers, 'pin_memory': True} if use_cuda else {}
 test_loader = torch.utils.data.DataLoader(
     dataset.listDataset(testlist, shape=(init_width, init_height),
@@ -120,7 +121,12 @@ for key, value in params_dict.items():
     else:
         params += [{'params': [value], 'weight_decay': decay*batch_size}]
 
-optimizer = optim.SGD(model.parameters(), lr=learning_rate/batch_size, momentum=momentum, dampening=0, weight_decay=decay*batch_size)
+optimizer = optim.SGD(model.parameters(),
+                      lr=learning_rate/batch_size,
+                      momentum=momentum,
+                      dampening=0,
+                      weight_decay=decay*batch_size,
+                      nesterov=True)
 # optimizer = optim.Adam(model.parameters(), lr=learning_rate/batch_size,weight_decay=decay*batch_size)
 
 
@@ -300,23 +306,26 @@ if evaluate:
     test(0)
 else:
 
+    vals_path = BASE_PATH+'vals'
+    if not os.path.exists(vals_path):
+        os.mkdir(vals_path)
     print ("MAX EPOCHS :",max_epochs)
     print ("USING EPOCHS :",epochs_arg)
+    print ("STARTING FROM :",init_epoch)
     for epoch in range(init_epoch, epochs_arg):
-    # for epoch in range(0, 5):
         train(epoch)
         sys.stdout.flush()
         test(epoch)
         sys.stdout.flush()
 
-    vals_path = BASE_PATH+'vals'
-    if not os.path.exists(vals_path):
-        os.mkdir(vals_path)
-    print ("MODEL SAVE TO PICKLE")
+        if epoch % 10 and epoch > 0:
+            print ("MODEL SAVE TO PICKLE")
+            pickle_fname = vals_path + "/ep_"+str(epoch)+"_"+str(epochs_arg)+"_darknet_bayes_+"+str(int(time.time()))+".pkl"
+            torch.save(model.state_dict(), pickle_fname)
 
-    pickle_fname = vals_path + "/ep_"+str(max_epochs)+"_darknet_bayes_+"+str(int(time.time()))+".pkl"
+    print ("MODEL SAVE TO PICKLE")
+    pickle_fname = vals_path + "/ep_"+"fin"+"_"+str(epochs_arg)+"_darknet_bayes_+"+str(int(time.time()))+".pkl"
     torch.save(model.state_dict(), pickle_fname)
-    print ("model")
 
     layers = model.module.kl_list
     thresholds = [-3,-3,-3,-3,-3,-3,-3,-3,-3]
@@ -350,9 +359,9 @@ else:
         layer.post_bias_mu = (torch.Tensor(bias).cuda())
         model.module.blocks[block_i]['filters'] = int(layer.post_bias_mu.shape[0])
 
-    paths,vals_path = model.module.save_weights_txt(max_epochs,vals_path,after=True)
+    paths,vals_path = model.module.save_weights_txt(epochs_arg,vals_path,after=True)
     save_cfg(model.module.blocks,vals_path+'/output.cfg')
-    header_gen(paths,vals_path +'/header_ep' + str(max_epochs)+'.h')
+    header_gen(paths,vals_path +'/header_ep' + str(epochs_arg)+'.h')
 
     for layer in layers: layer.deterministic = True
 
