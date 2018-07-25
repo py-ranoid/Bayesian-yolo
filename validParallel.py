@@ -6,7 +6,7 @@ from torch.autograd import Variable
 from torchvision import datasets, transforms
 from utils import *
 import os
-
+import matplotlib.pyplot as plt
 def valid(datacfg, cfgfile, weightfile, outfile):
     options = read_data_cfg(datacfg)
     valid_images = options['valid']
@@ -30,7 +30,7 @@ def valid(datacfg, cfgfile, weightfile, outfile):
     m.module.eval()
 
 #################################################
-    """
+    # """
     layers = [m.module.models[0].conv1,
               m.module.models[2].conv2,
               m.module.models[4].conv3,
@@ -40,24 +40,46 @@ def valid(datacfg, cfgfile, weightfile, outfile):
               m.module.models[12].conv7,
               m.module.models[13].conv8,
               m.module.models[14].conv9]
-    thresholds = [-3,-3,-3,-3,-3,-3,-3,-3,-3]
-    sig,exp = compute_compression_rate(layers, m.module.get_masks(thresholds))
+    # """
+    # log_alphas = [l.get_log_dropout_rates() for l in layers]
+    #
+    # thresh_path = './thresh_plots'
+    # if not os.path.exists(thresh_path):
+    #     os.mkdir(thresh_path)
+    # for lr,lar in enumerate(log_alphas):
+    #     fname = thresh_path +'/logalpha_ep_'+str(int(time.time()))+'_lr'+str(lr)+'.txt'
+    #     # np.savetxt(fname,lar.cpu().data.numpy())
+    #     plt.hist(lar.cpu().data.numpy(), bins=80)
+    #     plt.xlabel('Threshold')
+    #     plt.ylabel('# Groups')
+    #     plt.savefig(thresh_path+'/tiny_yolo_epochs64_layer%d' %
+    #                 (lr))
+    #     plt.show()
+    #     plt.close()
+    #
+    # exit()
+    # """
+    # thresholds = [-8.95,-8.98,-8.97,-8.98,-8.975,-8.975,-8.975,-8.975,-8.975]
+    # thresholds = [-8.95,-8.95,-8.97,-8.98,-8.975,-8.98,-8.98,-8.98,-8.9]
+    # thresholds = [-8,-8,-8,-8,-8,-8,-8,-8,-8]
+    # thresholds = [-3]*9
+    # sig,exp = compute_compression_rate(layers, m.module.get_masks(thresholds))
+    #
+    #
+    # print("Test error after with reduced bit precision:")
+    #
+    # weights,biases = compute_reduced_weights(layers, m.module.get_masks(thresholds),sig,exp)
+    # for layer, weight,bias in zip(layers, weights,biases):
+    #     if True:
+    #         print (layer.post_weight_mu.shape)
+    #         print (weight.shape)
+    #         layer.post_weight_mu.data = torch.Tensor(weight).cuda()
+    #         layer.post_bias_mu = torch.Tensor(bias).cuda()
+    #     else:
+    #         layer.post_weight_mu.data = torch.Tensor(weight)
+    # for layer in layers: layer.deterministic = True
+    # """
 
-
-    print("Test error after with reduced bit precision:")
-
-    weights,biases = compute_reduced_weights(layers, m.module.get_masks(thresholds),sig,exp)
-    for layer, weight,bias in zip(layers, weights,biases):
-        if True:
-            print (layer.post_weight_mu.shape)
-            print (weight.shape)
-            layer.post_weight_mu.data = torch.Tensor(weight).cuda()
-            layer.post_bias_mu = torch.Tensor(bias).cuda()
-        else:
-            layer.post_weight_mu.data = torch.Tensor(weight)
-    for layer in layers: layer.deterministic = True
-    """
-    
 ##########################################
 
     valid_dataset = dataset.listDataset(valid_images, shape=(m.module.width, m.module.height),
@@ -77,6 +99,7 @@ def valid(datacfg, cfgfile, weightfile, outfile):
         os.mkdir('results')
     for i in range(m.module.num_classes):
         buf = '%s/%s%s.txt' % (prefix, outfile, names[i])
+        print (buf,i)
         fps[i] = open(buf, 'w')
 
     lineId = -1
@@ -107,6 +130,7 @@ def valid(datacfg, cfgfile, weightfile, outfile):
                     cls_id = box[6+2*j]
                     prob =det_conf * cls_conf
                     fps[cls_id].write('%s %f %f %f %f %f\n' % (fileId, prob, x1, y1, x2, y2))
+                    print ("WROTE")
 
     for i in range(m.module.num_classes):
         fps[i].close()
@@ -117,7 +141,9 @@ if __name__ == '__main__':
         datacfg = sys.argv[1]
         cfgfile = sys.argv[2]
         weightfile = sys.argv[3]
-        outfile = 'comp4_det_test_'
+        epoch = weightfile.strip().split('_')[1]
+        outfile = 'comp4_det_test_'.replace('4','_ep'+epoch)
+        print (outfile)
         valid(datacfg, cfgfile, weightfile, outfile)
     else:
         print('Usage:')
