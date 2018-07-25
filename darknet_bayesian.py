@@ -70,11 +70,25 @@ class Darknet(nn.Module):
         super(Darknet, self).__init__()
         self.blocks = parse_cfg(cfgfile)
         self.conv_blocks_indices = [i for i,b in enumerate(self.blocks) if b['type']== 'convolutional']
+        self.bayes_blocks_indices = [i for i,b in enumerate(self.blocks) if b.get('bayes','0')== '1']
         self.models = self.create_network(self.blocks) # merge conv, bn,leaky
 
-        self.kl_list = [self.models[0].conv1, self.models[2].conv2,self.models[4].conv3,self.models[6].conv4,self.models[8].conv5,self.models[10].conv6,self.models[12].conv7,self.models[13].conv8,self.models[14].conv9]
-        self.loss = self.models[len(self.models)-1]
+        self.all_conv = [self.models[0].conv1,
+                        self.models[2].conv2,
+                        self.models[4].conv3,
+                        self.models[6].conv4,
+                        self.models[8].conv5,
+                        self.models[10].conv6,
+                        self.models[12].conv7,
+                        self.models[13].conv8,
+                        self.models[14].conv9]
+        self.kl_list = []
+        for i,layer in zip(self.conv_blocks_indices,self.all_conv):
+            if i in self.bayes_blocks_indices:
+                self.kl_list.append(layer)
 
+        self.loss = self.models[len(self.models)-1]
+        # self.replace_bayesian_layers()
         self.width = int(self.blocks[0]['width'])
         self.height = int(self.blocks[0]['height'])
 
