@@ -87,6 +87,19 @@ class Darknet(nn.Module):
         self.header = torch.IntTensor([0,0,0,0])
         self.seen = 0
 
+    def replace_bayesian_layers(self,layers=None):
+        # layers = [self.kl_list[-1]] if layers is None else layers
+        # for l in
+        old_layer = self.kl_list[-1]
+        new_layer = nn.Conv2d(old_layer.in_channels,
+                              old_layer.out_channels,
+                              old_layer.kernel_size,
+                              old_layer.stride,
+                              old_layer.padding,
+                              bias=False)
+        self.kl_list[-1] = new_layer
+        print ("REPLACED LAST LAYER")
+
     def get_masks(self, thresholds):
         layers = self.kl_list
         weight_masks = []
