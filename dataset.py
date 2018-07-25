@@ -34,6 +34,8 @@ class listDataset(Dataset):
     def __getitem__(self, index):
         assert index <= len(self), 'index range error'
         imgpath = self.lines[index].rstrip()
+        if os.environ.get('GANDIVA_USER',None):
+            imgpath = imgpath.replace('./','/gandiva-store/user1/yolo/')
 
         if self.train and index % 64== 0:
             if self.seen < 4000*64:

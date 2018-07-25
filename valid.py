@@ -1,6 +1,7 @@
 from darknet_bayesian import Darknet
 import dataset
 import torch
+from compression2 import compute_compression_rate,compute_reduced_weights
 from torch.autograd import Variable
 from torchvision import datasets, transforms
 from utils import *
@@ -18,20 +19,49 @@ def valid(datacfg, cfgfile, weightfile, outfile):
         valid_files = [item.rstrip() for item in tmp_files]
 
     m = Darknet(cfgfile)
+
+    # m.load_state_dict(torch.load("darknet_bayes_60.pkl"))
+    # m = torch.nn.DataParallel(m).cuda()
+    m.load_state_dict(torch.load(weightfile))
     m.print_network()
-    print ("Loading :",weightfile)
-    if os.path.isfile(weightfile):
-        m.load_weights(weightfile)
-    else:
-        m.load_weights_txt(weightfile)
+    # m.load_weights(weightfile)
+
     m.cuda()
     m.eval()
+
+#################################################
+    """
+    layers = [m.models[0].conv1,
+              m.models[2].conv2,
+              m.models[4].conv3,
+              m.models[6].conv4,
+              m.models[8].conv5,
+              m.models[10].conv6,
+              m.models[12].conv7,
+              m.models[13].conv8,
+              m.models[14].conv9]
+    thresholds = [-3,-3,-3,-3,-3,-3,-3,-3,-3]
+    sig,exp = compute_compression_rate(layers, m.get_masks(thresholds))
+
+
+    print("Test error after with reduced bit precision:")
+
+    weights,biases = compute_reduced_weights(layers, m.get_masks(thresholds),sig,exp)
+    for layer, weight,bias in zip(layers, weights,biases):
+        if True:
+            layer.post_weight_mu.data = torch.Tensor(weight).cuda()
+            layer.post_bias_mu = torch.Tensor(bias).cuda()
+        else:
+            layer.post_weight_mu.data = torch.Tensor(weight)
+    for layer in layers: layer.deterministic = True
+    """
+
+##########################################
 
     valid_dataset = dataset.listDataset(valid_images, shape=(m.width, m.height),
                        shuffle=False,
                        transform=transforms.Compose([
                            transforms.ToTensor(),
-                           lambda x: 2 * (x - 0.5)
                        ]))
     valid_batchsize = 2
     assert(valid_batchsize > 1)

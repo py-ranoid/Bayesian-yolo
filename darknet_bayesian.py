@@ -70,11 +70,25 @@ class Darknet(nn.Module):
         super(Darknet, self).__init__()
         self.blocks = parse_cfg(cfgfile)
         self.conv_blocks_indices = [i for i,b in enumerate(self.blocks) if b['type']== 'convolutional']
+        self.bayes_blocks_indices = [i for i,b in enumerate(self.blocks) if b.get('bayes','0')== '1']
         self.models = self.create_network(self.blocks) # merge conv, bn,leaky
 
-        self.kl_list = [self.models[0].conv1, self.models[2].conv2,self.models[4].conv3,self.models[6].conv4,self.models[8].conv5,self.models[10].conv6,self.models[12].conv7,self.models[13].conv8,self.models[14].conv9]
-        self.loss = self.models[len(self.models)-1]
+        self.all_conv = [self.models[0].conv1,
+                        self.models[2].conv2,
+                        self.models[4].conv3,
+                        self.models[6].conv4,
+                        self.models[8].conv5,
+                        self.models[10].conv6,
+                        self.models[12].conv7,
+                        self.models[13].conv8,
+                        self.models[14].conv9]
+        self.kl_list = []
+        for i,layer in zip(self.conv_blocks_indices,self.all_conv):
+            if i in self.bayes_blocks_indices:
+                self.kl_list.append(layer)
 
+        self.loss = self.models[len(self.models)-1]
+        # self.replace_bayesian_layers()
         self.width = int(self.blocks[0]['width'])
         self.height = int(self.blocks[0]['height'])
 
@@ -86,6 +100,19 @@ class Darknet(nn.Module):
 
         self.header = torch.IntTensor([0,0,0,0])
         self.seen = 0
+
+    def replace_bayesian_layers(self,layers=None):
+        # layers = [self.kl_list[-1]] if layers is None else layers
+        # for l in
+        old_layer = self.kl_list[-1]
+        new_layer = nn.Conv2d(old_layer.in_channels,
+                              old_layer.out_channels,
+                              old_layer.kernel_size,
+                              old_layer.stride,
+                              old_layer.padding,
+                              bias=False)
+        self.kl_list[-1] = new_layer
+        print ("REPLACED LAST LAYER")
 
     def get_masks(self, thresholds):
         layers = self.kl_list
@@ -205,9 +232,6 @@ class Darknet(nn.Module):
         outputs = dict()
         for block in self.blocks:
             ind = ind + 1
-            #if ind > 0:
-            #    return x
-
             if block['type'] == 'net':
                 continue
             elif block['type'] == 'convolutional' or block['type'] == 'maxpool' or block['type'] == 'reorg' or block['type'] == 'avgpool' or block['type'] == 'softmax' or block['type'] == 'connected':
@@ -267,23 +291,34 @@ class Darknet(nn.Module):
                 conv_id = conv_id + 1
                 batch_normalize = int(block['batch_normalize'])
                 filters = int(block['filters'])
+                bayes = int(block['bayes'])
                 kernel_size = int(block['size'])
                 stride = int(block['stride'])
                 is_pad = int(block['pad'])
                 pad = (kernel_size-1)/2 if is_pad else 0
                 activation = block['activation']
                 model = nn.Sequential()
-                if batch_normalize:
-                    # model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, pad, bias=False))
-
-                    model.add_module('conv{0}'.format(conv_id), BayesianLayers.Conv2dGroupNJ(prev_filters, filters, kernel_size,stride,pad,bias=False,cuda=True))
-                    model.add_module('bn{0}'.format(conv_id), nn.BatchNorm2d(filters))
-                    #model.add_module('bn{0}'.format(conv_id), BN2d(filters))
+                if bayes:
+                    model.add_module('conv{0}'.format(conv_id),
+                                     BayesianLayers.Conv2dGroupNJ(prev_filters, filters, kernel_size,stride,pad,bias=False,cuda=True)
+                                     )
                 else:
-                    # model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, pad))
-                    model.add_module('conv{0}'.format(conv_id), BayesianLayers.Conv2dGroupNJ(prev_filters, filters, kernel_size,stride,pad,cuda=True))
-
-
+                    model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, pad, bias=False))
+                if batch_normalize:
+                    if bayes:
+                        model.add_module('conv{0}'.format(conv_id),
+                                         BayesianLayers.Conv2dGroupNJ(prev_filters, filters, kernel_size,stride,pad,bias=False,cuda=True)
+                                         )
+                    else:
+                        model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, pad, bias=False))
+                    model.add_module('bn{0}'.format(conv_id), nn.BatchNorm2d(filters))
+                else:
+                    if bayes:
+                        model.add_module('conv{0}'.format(conv_id),
+                                         BayesianLayers.Conv2dGroupNJ(prev_filters, filters, kernel_size,stride,pad,bias=False,cuda=True)
+                                         )
+                    else:
+                        model.add_module('conv{0}'.format(conv_id), nn.Conv2d(prev_filters, filters, kernel_size, stride, pad))
                 if activation == 'leaky':
                     model.add_module('leaky{0}'.format(conv_id), nn.LeakyReLU(0.1, inplace=True))
                 elif activation == 'relu':
@@ -393,38 +428,18 @@ class Darknet(nn.Module):
             elif block['type'] == 'convolutional':
                 model = self.models[ind]
                 batch_normalize = int(block['batch_normalize'])
-                # print batch_normalize
-                if batch_normalize:
-                    conv_model = model[0]
-                    bn_model = model[1]
-                    # start = load_conv_bn(buf, start, model[0], model[1])
-                    num_w = conv_model.weight_mu.numel()
-                    num_b = bn_model.bias.numel()
-                    # bn_model.bias.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.bias.shape[0],bn_model.bias.shape[1], bn_model.bias.shape[2],bn_model.bias.shape[3])))
-                    # start = start + num_b
-                    # bn_model.weight.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.weight.shape[0],bn_model.weight.shape[1], bn_model.weight.shape[2],bn_model.weight.shape[3])))
-                    # start = start + num_b
-                    # bn_model.running_mean.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.running_mean.shape[0],bn_model.running_mean.shape[1], bn_model.running_mean.shape[2],bn_model.running_mean.shape[3])));
-                    # start = start + num_b
-                    # bn_model.running_var.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(bn_model.running_var.shape[0],bn_model.running_var.shape[1], bn_model.running_var.shape[2],bn_model.running_var.shape[3])));
-                    # start = start + num_b
-                    bn_model.bias.data.copy_(torch.from_numpy(buf[start:start+num_b]));     start = start + num_b
-                    bn_model.weight.data.copy_(torch.from_numpy(buf[start:start+num_b]));   start = start + num_b
-                    bn_model.running_mean.copy_(torch.from_numpy(buf[start:start+num_b]));  start = start + num_b
-                    bn_model.running_var.copy_(torch.from_numpy(buf[start:start+num_b]));   start = start + num_b
-
-                    conv_model.weight_mu.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(conv_model.weight_mu.shape[0],conv_model.weight_mu.shape[1], conv_model.weight_mu.shape[2],conv_model.weight_mu.shape[3])));
-                    start = start + num_w
-
+                bayes = int(block['bayes'])
+                if bayes:
+                    if batch_normalize:
+                        start = load_conv_bn_bayes(buf, start, model[0], model[1])
+                    else:
+                        start = load_conv_bayes(buf, start, model[0])
                 else:
-                    conv_model = model[0]
-                    num_w = conv_model.weight_mu.numel()
-                    num_b = conv_model.bias_mu.numel()
-                    conv_model.bias_mu.data.copy_(torch.from_numpy(buf[start:start+num_b]));
-                    start = start + num_b
-                    conv_model.weight_mu.data.copy_(torch.reshape(torch.from_numpy(buf[start:start+num_w]),(conv_model.weight_mu.shape[0],conv_model.weight_mu.shape[1], conv_model.weight_mu.shape[2],conv_model.weight_mu.shape[3])));
-                    start = start + num_w
-                #     start = load_conv(buf, start, model[0])
+                    if batch_normalize:
+                        start = load_conv_bn(buf, start, model[0], model[1])
+                    else:
+                        start = load_conv(buf, start, model[0])
+
             elif block['type'] == 'connected':
                 model = self.models[ind]
                 if block['activation'] != 'linear':

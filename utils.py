@@ -307,7 +307,7 @@ def read_truths(lab_path):
     if os.path.getsize(lab_path):
         truths = np.loadtxt(lab_path)
         # to avoid single truth problem
-        truths = truths.reshape(truths.size / 5, 5)
+        truths = truths.reshape(int(truths.size / 5), 5)
         return truths
     else:
         return np.array([])
